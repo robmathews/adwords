@@ -19,7 +19,9 @@ export interface SimulationParams {
 }
 
 // Backend API URL
-const API_BASE_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.PROD
+  ? '/api'  // In production (Heroku), use relative path
+  : (import.meta.env.VITE_APP_API_URL || 'http://localhost:3001/api');  // In development, use the env var or default
 
 /**
  * Service for handling interactions with the backend microservice

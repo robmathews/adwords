@@ -120,9 +120,15 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   // Find the best performing demographic
   const bestPerformingDemo = useMemo(() => {
     if (!demographicComparisonData.length) return null;
-    
+
     return demographicComparisonData
-      .sort((a, b) => b.followAndBuy - a.followAndBuy)[0];
+      .sort((a, b) => {
+        // Add null checks for a and b
+        if (a === null && b === null) return 0;
+        if (a === null) return 1;  // null values sort after non-null
+        if (b === null) return -1; // non-null values sort before null
+        return b.followAndBuy - a.followAndBuy; // Original comparison
+      })[0];
   }, [demographicComparisonData]);
   
   // Custom tooltip for charts

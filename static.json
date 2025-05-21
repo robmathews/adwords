@@ -1,0 +1,11 @@
+
+{
+  "root": "frontend/dist",
+  "clean_urls": true,
+  "routes": {
+    "/api/*": {
+      "origin": "${API_URL}"
+    },
+    "/**": "index.html"
+  }
+}
