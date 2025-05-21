@@ -26,10 +26,99 @@ export interface SimulationParams {
   tagline: string;
 }
 
+// Retry configuration
+interface RetryConfig {
+  maxRetries: number;
+  initialDelayMs: number;
+  maxDelayMs: number;
+  backoffFactor: number;
+}
+
+const defaultRetryConfig: RetryConfig = {
+  maxRetries: 5,
+  initialDelayMs: 1000, // Start with 1 second delay
+  maxDelayMs: 30000,    // Max 30 second delay
+  backoffFactor: 2,     // Exponential backoff factor
+};
+
 // Initialize Claude client with API key from environment variable
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
 });
+
+/**
+ * Implements exponential backoff with jitter for retry delays
+ */
+function calculateBackoffDelay(attempt: number, config: RetryConfig): number {
+  // Calculate exponential backoff
+  const exponentialDelay = Math.min(
+    config.maxDelayMs,
+    config.initialDelayMs * Math.pow(config.backoffFactor, attempt)
+  );
+
+  // Add jitter (random value between 0.5 and 1.5 of the calculated delay)
+  const jitter = 0.5 + Math.random();
+  return Math.floor(exponentialDelay * jitter);
+}
+
+/**
+ * Determines if an error is retryable
+ */
+function isRetryableError(error: any): boolean {
+  // 429 is rate limiting, 529 is service overloaded, 5xx are server errors
+  if (error.status === 429 || error.status === 529 || (error.status >= 500 && error.status < 600)) {
+    return true;
+  }
+
+  // Check for network errors or connection issues
+  if (error.code === 'ECONNRESET' ||
+      error.code === 'ETIMEDOUT' ||
+      error.code === 'ECONNREFUSED' ||
+      error.message?.includes('timeout') ||
+      error.message?.includes('network') ||
+      error.message?.includes('connection')) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Generic retry wrapper function for API calls
+ */
+async function withRetry<T>(
+  apiCall: () => Promise<T>,
+  retryConfig: RetryConfig = defaultRetryConfig
+): Promise<T> {
+  let lastError: any;
+
+  for (let attempt = 0; attempt < retryConfig.maxRetries; attempt++) {
+    try {
+      return await apiCall();
+    } catch (error: any) {
+      lastError = error;
+
+      // Log the error
+      console.error(`API call failed (attempt ${attempt + 1}/${retryConfig.maxRetries}):`,
+        error.status || error.code || 'unknown error');
+
+      // Check if we should retry
+      if (!isRetryableError(error) || attempt >= retryConfig.maxRetries - 1) {
+        break;
+      }
+
+      // Calculate backoff delay with jitter
+      const delayMs = calculateBackoffDelay(attempt, retryConfig);
+      console.log(`Retrying in ${delayMs}ms...`);
+
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+
+  // If we've exhausted all retries, throw the last error
+  throw lastError;
+}
 
 /**
  * Generate demographic profiles using Claude
@@ -39,7 +128,7 @@ export async function generateDemographics(
 ): Promise<Demographics[]> {
   console.log('Generating demographics with params:', params);
 
-  try {
+  return withRetry(async () => {
     const response = await anthropic.messages.create({
       model: "claude-3-5-haiku-latest",
       max_tokens: 1000,
@@ -99,13 +188,15 @@ export async function generateDemographics(
     }
 
     // Parse the response content to extract the demographics JSON
-    const demographics = JSON.parse(jsonContent) as Demographics[];
-
-    return demographics;
-  } catch (error) {
-    console.error('Error generating demographics:', error);
-    throw error;
-  }
+    try {
+      const demographics = JSON.parse(jsonContent) as Demographics[];
+      return demographics;
+    } catch (parseError) {
+      console.error('Failed to parse demographics JSON:', parseError);
+      console.error('Raw response:', jsonContent);
+      throw new Error('Failed to parse demographics from LLM response');
+    }
+  });
 }
 
 /**
@@ -114,7 +205,7 @@ export async function generateDemographics(
 export async function simulateResponse(params: SimulationParams): Promise<LLMResponse> {
   console.log('Simulating response for demographic:', params.demographic.id);
 
-  try {
+  return withRetry(async () => {
     const response = await anthropic.messages.create({
       model: "claude-3-5-haiku-latest",
       max_tokens: 150,
@@ -177,13 +268,15 @@ export async function simulateResponse(params: SimulationParams): Promise<LLMRes
     }
 
     // Parse the response content to extract the response JSON
-    const simulationResponse = JSON.parse(jsonContent) as LLMResponse;
-
-    return simulationResponse;
-  } catch (error) {
-    console.error('Error simulating response:', error);
-    throw error;
-  }
+    try {
+      const simulationResponse = JSON.parse(jsonContent) as LLMResponse;
+      return simulationResponse;
+    } catch (parseError) {
+      console.error('Failed to parse simulation response JSON:', parseError);
+      console.error('Raw response:', jsonContent);
+      throw new Error('Failed to parse simulation response from LLM');
+    }
+  });
 }
 
 /**
@@ -195,24 +288,99 @@ export async function runBatchSimulations(
 ): Promise<LLMResponse[]> {
   const results: LLMResponse[] = [];
   const batchSize = 5; // Process in smaller batches to avoid rate limits
-  
+  let consecutiveErrors = 0;
+  const maxConsecutiveErrors = 3;
+
   // Process in batches
   for (let i = 0; i < count; i += batchSize) {
     const currentBatchSize = Math.min(batchSize, count - i);
     const batch = Array(currentBatchSize).fill(null);
-    
-    // Run concurrent requests for this batch
-    const batchResults = await Promise.all(
-      batch.map(() => simulateResponse(params))
-    );
-    
-    results.push(...batchResults);
-    
-    // Add a small delay between batches to avoid rate limiting
-    if (i + batchSize < count) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+
+    try {
+      // Run concurrent requests for this batch
+      const batchResults = await Promise.all(
+        batch.map(() => simulateResponse(params))
+      );
+
+      results.push(...batchResults);
+      consecutiveErrors = 0; // Reset error counter on success
+
+      // Add a small delay between batches to avoid rate limiting
+      if (i + batchSize < count) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } catch (error) {
+      console.error(`Error processing batch at index ${i}:`, error);
+      consecutiveErrors++;
+
+      // If we have too many consecutive errors, reduce batch size and retry the current batch
+      if (consecutiveErrors >= maxConsecutiveErrors) {
+        console.log('Too many consecutive errors, reducing batch size');
+        // Reduce batch size temporarily
+        const reducedBatchSize = Math.max(1, Math.floor(batchSize / 2));
+
+        // Retry with reduced batch size
+        for (let j = 0; j < currentBatchSize; j += reducedBatchSize) {
+          const retryBatchSize = Math.min(reducedBatchSize, currentBatchSize - j);
+          try {
+            // Sequential processing instead of parallel to reduce load
+            for (let k = 0; k < retryBatchSize; k++) {
+              const result = await simulateResponse(params);
+              results.push(result);
+              // Add a small delay between each request
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            // If we get here, the retry was successful
+            consecutiveErrors = 0;
+          } catch (retryError) {
+            console.error(`Error in reduced batch retry at index ${i+j}:`, retryError);
+
+            // Add fallback responses for the failed items
+            for (let k = 0; k < retryBatchSize; k++) {
+              results.push(createFallbackResponse());
+            }
+          }
+        }
+      } else {
+        // Add fallback responses for the current batch
+        for (let j = 0; j < currentBatchSize; j++) {
+          results.push(createFallbackResponse());
+        }
+
+        // Wait a bit longer before the next batch
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
     }
   }
-  
+
   return results;
 }
+
+/**
+ * Creates a fallback response when API calls fail
+ */
+function createFallbackResponse(): LLMResponse {
+  const choices: Array<'ignore' | 'followLink' | 'followAndBuy' | 'followAndSave'> = [
+    'ignore', 'followLink', 'followAndBuy', 'followAndSave'
+  ];
+
+  // Choose one randomly, with higher probability for 'ignore'
+  const random = Math.random();
+  let choice: 'ignore' | 'followLink' | 'followAndBuy' | 'followAndSave';
+
+  if (random < 0.5) {
+    choice = 'ignore';
+  } else if (random < 0.75) {
+    choice = 'followLink';
+  } else if (random < 0.9) {
+    choice = 'followAndSave';
+  } else {
+    choice = 'followAndBuy';
+  }
+
+  return {
+    choice,
+    text: "Response generated by fallback system due to API unavailability."
+  };
+}
+
