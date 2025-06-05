@@ -7,8 +7,7 @@ import { DemographicManager } from './components/DemographicManager';
 import { SimulationConfig, SimulationConfig as SimConfig } from './components/SimulationConfig';
 import { SimulationProgress } from './components/SimulationProgress';
 import { LLMService, LLMResponse } from './services/LLMService';
-
-
+import { TestRun, Demographics, SimulationResult } from './types';
 
 type AppStep =
   | 'suggestion'           // Initial suggestion form

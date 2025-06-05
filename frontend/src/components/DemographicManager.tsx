@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Demographics } from '../App';
+import { Demographics } from '../types';
 import { DemographicEditor } from './DemographicEditor';
 import { getMosaicCategoryByName } from '../utils/MosaicCategories';
 

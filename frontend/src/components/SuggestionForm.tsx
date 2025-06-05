@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TestRun } from '../App';
+import { TestRun } from '../types';
 import { LLMService } from '../services/LLMService';
 
 interface SuggestionFormProps {

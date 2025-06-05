@@ -1,5 +1,5 @@
 // src/services/LLMService.ts
-import { Demographics } from '../App';
+import { Demographics } from '../types';
 
 // Types
 export type LLMResponse = {

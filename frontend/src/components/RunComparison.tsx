@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { TestRun } from '../App';
+import { TestRun } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import {
   calculateStatisticalSignificance,

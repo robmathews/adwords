@@ -6,9 +6,8 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "baml-generate": "baml-cli generate",
     "dev": "vite",
-    "build": "npm run baml-generate && tsc && vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview",
     "start": "node dist/index.js"
   },
@@ -24,7 +23,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.51.0",
-    "@boundaryml/baml": "^0.88.0",
     "@types/lodash": "^4.14.197",
     "@types/react-router-dom": "^5.3.3",
     "@types/node": "^20.9.0",

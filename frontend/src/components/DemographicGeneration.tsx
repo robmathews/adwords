@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Demographics } from '../App';
+import { Demographics } from '../types';
 import { LLMService } from '../services/LLMService';
 
 interface DemographicGenerationProps {
