@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
-import { Demographics } from '../App';
-import { ProductVariant } from './InputForm';
-
+import { ProductVariant, Demographics } from '../types';
 interface SimulationConfigProps {
   demographics: Demographics[];
   productVariants: ProductVariant[];

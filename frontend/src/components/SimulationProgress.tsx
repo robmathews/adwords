@@ -1,6 +1,5 @@
 import React from 'react';
-import { Demographics, SimulationResult } from '../App';
-import { ProductVariant } from './InputForm';
+import { ProductVariant, Demographics, SimulationResult } from '../types';
 import { LLMResponse } from '../services/LLMService';
 
 interface SimulationProgressProps {
