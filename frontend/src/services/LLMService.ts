@@ -18,6 +18,16 @@ export interface SimulationParams {
   tagline: string;
 }
 
+export interface ProductSuggestionParams {
+  productDescription: string;
+  targetMarket: string;
+}
+
+export interface ProductSuggestionResponse {
+  productDescriptions: string[];
+  taglines: string[];
+}
+
 // Backend API URL
 const API_BASE_URL = import.meta.env.PROD
   ? '/api'  // In production (Heroku), use relative path
@@ -27,6 +37,48 @@ const API_BASE_URL = import.meta.env.PROD
  * Service for handling interactions with the backend microservice
  */
 export class LLMService {
+  /**
+   * Generate product description and tagline suggestions for A/B testing
+   */
+  static async generateProductSuggestions(
+    params: ProductSuggestionParams
+  ): Promise<ProductSuggestionResponse> {
+    console.log('Requesting product suggestions with params:', params);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/suggestions/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to generate suggestions');
+      }
+
+      const data = await response.json();
+      return data.data as ProductSuggestionResponse;
+    } catch (error) {
+      console.error('Error generating suggestions:', error);
+      // Return fallback suggestions in case of an error
+      return {
+        productDescriptions: [
+          params.productDescription,
+          `Premium ${params.productDescription.toLowerCase()}`,
+          `High-quality ${params.productDescription.toLowerCase()} for ${params.targetMarket.toLowerCase()}`
+        ],
+        taglines: [
+          'Wear your favorite character',
+          'Level up your style',
+          'Game on with premium gear'
+        ]
+      };
+    }
+  }
+
   /**
    * Call backend to generate demographic profiles
    */

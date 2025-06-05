@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
-import { InputForm } from './components/InputForm';
+import { InputForm, ProductVariant } from './components/InputForm';
 import { ResultsDisplay } from './components/ResultsDisplay';
 import { DemographicGeneration } from './components/DemographicGeneration';
 import { DemographicManager } from './components/DemographicManager';
@@ -20,6 +20,7 @@ export type Demographics = {
 
 export type SimulationResult = {
   demographicId: string;
+  variantId: string;
   responses: {
     ignore: number;
     followLink: number;
@@ -29,8 +30,19 @@ export type SimulationResult = {
   totalSims: number;
 };
 
+export type VariantPerformance = {
+  variantId: string;
+  overallEngagement: number;
+  overallConversion: number;
+  demographicResults: {
+    demographicId: string;
+    engagement: number;
+    conversion: number;
+  }[];
+};
+
 type AppStep =
-  | 'input'               // Initial input form
+  | 'input'               // Initial input form with A/B variant creation
   | 'generating-demographics'  // Auto-generating demographics
   | 'manage-demographics'      // Review/edit demographics
   | 'configure-simulation'     // Set up simulation parameters
@@ -39,9 +51,8 @@ type AppStep =
 
 function App() {
   // State for our main app data
-  const [productDescription, setProductDescription] = useState('');
+  const [productVariants, setProductVariants] = useState<ProductVariant[]>([]);
   const [targetMarket, setTargetMarket] = useState('');
-  const [tagline, setTagline] = useState('');
   const [demographics, setDemographics] = useState<Demographics[]>([]);
   const [results, setResults] = useState<SimulationResult[]>([]);
   const [simulationConfig, setSimulationConfig] = useState<SimConfig | null>(null);
@@ -49,15 +60,15 @@ function App() {
 
   // Simulation state
   const [currentDemographicId, setCurrentDemographicId] = useState<string | null>(null);
+  const [currentVariantId, setCurrentVariantId] = useState<string | null>(null);
   const [simulationsCompleted, setSimulationsCompleted] = useState(0);
   const [totalSimulations, setTotalSimulations] = useState(0);
   const [recentResponses, setRecentResponses] = useState<LLMResponse[]>([]);
 
-  // Handle the form submission
-  const handleSubmit = (product: string, market: string, tag: string) => {
-    setProductDescription(product);
+  // Handle the form submission with A/B variants
+  const handleSubmit = (variants: ProductVariant[], market: string) => {
+    setProductVariants(variants);
     setTargetMarket(market);
-    setTagline(tag);
     setCurrentStep('generating-demographics');
   };
 
@@ -82,11 +93,11 @@ function App() {
     setSimulationConfig(config);
     setCurrentStep('running-simulation');
 
-    // Calculate total simulations
+    // Calculate total simulations (demographics × variants × simulations per demographic)
     const selectedDemographics = demographics.filter(
       d => config.selectedDemographics.includes(d.id)
     );
-    const total = selectedDemographics.length * config.simulationsPerDemographic;
+    const total = selectedDemographics.length * productVariants.length * config.simulationsPerDemographic;
     setTotalSimulations(total);
 
     // Reset simulation state
@@ -98,7 +109,7 @@ function App() {
     runSimulations(selectedDemographics, config.simulationsPerDemographic);
   };
 
-  // Run simulations for all selected demographics
+  // Run simulations for all selected demographics and all variants
   const runSimulations = async (
     selectedDemographics: Demographics[],
     simulationsPerDemographic: number
@@ -109,65 +120,67 @@ function App() {
     for (const demographic of selectedDemographics) {
       setCurrentDemographicId(demographic.id);
 
-      // Initialize result object
-      const result: SimulationResult = {
-        demographicId: demographic.id,
-        responses: {
-          ignore: 0,
-          followLink: 0,
-          followAndBuy: 0,
-          followAndSave: 0
-        },
-        totalSims: simulationsPerDemographic
-      };
+      // For each variant
+      for (const variant of productVariants) {
+        setCurrentVariantId(variant.id);
 
-      // Run batch of simulations
-      const responses = await LLMService.runBatchSimulations(
-        {
-          demographic,
-          productDescription,
-          tagline
-        },
-        simulationsPerDemographic,
-        (completed, total) => {
-          // Update progress
-          setSimulationsCompleted(prev =>
-            prev + 1 - (prev % total === 0 ? 0 : prev % total)
-          );
-        }
-      );
+        // Initialize result object
+        const result: SimulationResult = {
+          demographicId: demographic.id,
+          variantId: variant.id,
+          responses: {
+            ignore: 0,
+            followLink: 0,
+            followAndBuy: 0,
+            followAndSave: 0
+          },
+          totalSims: simulationsPerDemographic
+        };
 
-      // Update recent responses (keep only most recent 10)
-      setRecentResponses(prev => {
-        const newResponses = [...responses.slice(-5), ...prev];
-        return newResponses.slice(0, 10);
-      });
+        // Run batch of simulations for this demographic-variant combination
+        const responses = await LLMService.runBatchSimulations(
+          {
+            demographic,
+            productDescription: variant.productDescription,
+            tagline: variant.tagline
+          },
+          simulationsPerDemographic,
+          (completed, total) => {
+            // Update progress
+            setSimulationsCompleted(prev => prev + 1);
+          }
+        );
 
-      // Count responses
-      responses.forEach(response => {
-        result.responses[response.choice]++;
-      });
+        // Update recent responses (keep only most recent 10)
+        setRecentResponses(prev => {
+          const newResponses = [...responses.slice(-3), ...prev];
+          return newResponses.slice(0, 10);
+        });
 
-      // Add to results
-      simulationResults.push(result);
-      setResults(prev => [...prev, result]);
+        // Count responses
+        responses.forEach(response => {
+          result.responses[response.choice]++;
+        });
 
-      // Increment completed simulations
-      setSimulationsCompleted(prev =>
-        prev + simulationsPerDemographic - (prev % simulationsPerDemographic)
-      );
+        // Add to results
+        simulationResults.push(result);
+        setResults(prev => [...prev, result]);
+
+        // Increment completed simulations
+        setSimulationsCompleted(prev => prev + simulationsPerDemographic);
+      }
     }
 
     // All simulations complete
     setCurrentDemographicId(null);
+    setCurrentVariantId(null);
     setCurrentStep('results');
   };
 
   // Reset the application
   const handleReset = () => {
-    setProductDescription('');
+    setProductVariants([]);
     setTargetMarket('');
-    setTagline('');
     setDemographics([]);
     setResults([]);
     setSimulationConfig(null);
@@ -175,6 +188,7 @@ function App() {
     setSimulationsCompleted(0);
     setTotalSimulations(0);
     setCurrentDemographicId(null);
+    setCurrentVariantId(null);
     setRecentResponses([]);
   };
 
@@ -186,7 +200,7 @@ function App() {
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-center mb-2 text-gradient">
-            AdWords Demographic Response Simulator
+            AdWords A/B Testing Simulator
           </h1>
 
           {/* Progress Steps */}
@@ -223,9 +237,9 @@ function App() {
             <div className="text-center text-sm text-gray-600">
               {currentStep === 'generating-demographics' && 'Generating Demographics'}
               {currentStep === 'manage-demographics' && 'Manage Demographics'}
-              {currentStep === 'configure-simulation' && 'Configure Simulation'}
-              {currentStep === 'running-simulation' && 'Running Simulations'}
-              {currentStep === 'results' && 'Results & Analysis'}
+              {currentStep === 'configure-simulation' && 'Configure A/B Testing'}
+              {currentStep === 'running-simulation' && 'Running A/B Tests'}
+              {currentStep === 'results' && 'A/B Test Results & Analysis'}
             </div>
           )}
         </div>
@@ -240,7 +254,7 @@ function App() {
 
           {currentStep === 'generating-demographics' && (
             <DemographicGeneration
-              productDescription={productDescription}
+              productDescription={productVariants[0]?.productDescription || ''}
               targetMarket={targetMarket}
               onComplete={handleDemographicsGenerated}
             />
@@ -257,6 +271,7 @@ function App() {
           {currentStep === 'configure-simulation' && (
             <SimulationConfig
               demographics={demographics}
+              productVariants={productVariants}
               onStartSimulation={handleStartSimulation}
               onBack={() => setCurrentStep('manage-demographics')}
             />
@@ -265,8 +280,10 @@ function App() {
           {currentStep === 'running-simulation' && (
             <SimulationProgress
               demographics={demographics}
+              productVariants={productVariants}
               results={results}
               currentDemographicId={currentDemographicId}
+              currentVariantId={currentVariantId}
               simulationsCompleted={simulationsCompleted}
               totalSimulations={totalSimulations}
               recentResponses={recentResponses}
@@ -277,6 +294,7 @@ function App() {
             <ResultsDisplay
               results={results}
               demographics={demographics}
+              productVariants={productVariants}
               onReset={handleReset}
             />
           )}
@@ -286,21 +304,26 @@ function App() {
         {currentStep !== 'input' && currentStep !== 'results' && (
           <div className="max-w-4xl mx-auto mt-8">
             <div className="bg-white bg-opacity-70 rounded-lg p-4 shadow-sm">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Campaign Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-500">Product:</span>
-                  <span className="ml-1">{productDescription}</span>
-                </div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">A/B Testing Configuration</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-gray-500">Target Market:</span>
                   <span className="ml-1">{targetMarket}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500">Tagline:</span>
-                  <span className="ml-1">"{tagline}"</span>
+                  <span className="text-gray-500">Test Variants:</span>
+                  <span className="ml-1">{productVariants.length}</span>
                 </div>
               </div>
+              {productVariants.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {productVariants.map((variant, index) => (
+                    <div key={variant.id} className="text-xs bg-gray-50 p-2 rounded">
+                      <span className="font-medium">Variant {index + 1}:</span> {variant.productDescription} - "{variant.tagline}"
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

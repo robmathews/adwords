@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Demographics } from '../App';
+import { ProductVariant } from './InputForm';
 
 interface SimulationConfigProps {
   demographics: Demographics[];
+  productVariants: ProductVariant[];
   onStartSimulation: (config: SimulationConfig) => void;
   onBack: () => void;
 }
@@ -14,14 +16,15 @@ export interface SimulationConfig {
 
 export const SimulationConfig: React.FC<SimulationConfigProps> = ({
   demographics,
+  productVariants,
   onStartSimulation,
   onBack
 }) => {
   const [config, setConfig] = useState<SimulationConfig>({
-    simulationsPerDemographic: 100,
+    simulationsPerDemographic: 10,
     selectedDemographics: demographics.map(d => d.id) // Select all by default
   });
-  
+
   // Handle changing the simulation count
   const handleSimCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value);
@@ -32,7 +35,7 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
       }));
     }
   };
-  
+
   // Handle toggling a demographic selection
   const handleToggleDemographic = (demoId: string) => {
     setConfig(prev => {
@@ -51,7 +54,7 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
       }
     });
   };
-  
+
   // Handle selecting/deselecting all demographics
   const handleSelectAll = (select: boolean) => {
     setConfig(prev => ({
@@ -59,24 +62,44 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
       selectedDemographics: select ? demographics.map(d => d.id) : []
     }));
   };
-  
-  // Calculate total simulations
-  const totalSimulations = config.simulationsPerDemographic * config.selectedDemographics.length;
-  
+
+  // Calculate total simulations (demographics × variants × simulations per demographic)
+  const totalSimulations = config.simulationsPerDemographic * config.selectedDemographics.length * productVariants.length;
+
   // Check if configuration is valid
   const isConfigValid = config.selectedDemographics.length > 0 && config.simulationsPerDemographic > 0;
-  
+
   // Estimate simulation time (rough estimate)
   const estimatedTime = Math.ceil(totalSimulations * 0.1); // 0.1 seconds per simulation is a rough estimate
-  
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="bg-white rounded-lg shadow-lg p-6">
-        <h2 className="text-xl font-semibold mb-4">Configure Simulation</h2>
-        
+        <h2 className="text-xl font-semibold mb-4">Configure A/B Testing Simulation</h2>
+
+        {/* A/B Testing Variants Display */}
+        <div className="mb-6">
+          <h3 className="text-lg font-medium text-gray-800 mb-3">Testing Variants</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {productVariants.map((variant, index) => (
+              <div key={variant.id} className="border rounded-lg p-3 bg-blue-50">
+                <h4 className="font-medium text-blue-800 mb-2">Variant {index + 1}</h4>
+                <div className="text-sm">
+                  <p className="text-gray-700 mb-1">
+                    <span className="font-medium">Product:</span> {variant.productDescription}
+                  </p>
+                  <p className="text-gray-700">
+                    <span className="font-medium">Tagline:</span> "{variant.tagline}"
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="mb-6">
           <label htmlFor="simCount" className="block text-sm font-medium text-gray-700 mb-1">
-            Simulations per Demographic
+            Simulations per Demographic per Variant
           </label>
           <div className="flex items-center space-x-4">
             <input
@@ -99,14 +122,14 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
             />
           </div>
           <p className="text-sm text-gray-500 mt-1">
-            Higher numbers provide more accurate results but take longer to simulate.
+            Each demographic will be tested against all {productVariants.length} variants. Higher numbers provide more accurate results but take longer.
           </p>
         </div>
-        
+
         <div className="mb-6">
           <div className="flex justify-between items-center mb-2">
             <label className="block text-sm font-medium text-gray-700">
-              Demographics to Include
+              Demographics to Include in Testing
             </label>
             <div className="flex space-x-2 text-sm">
               <button
@@ -126,7 +149,7 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
               </button>
             </div>
           </div>
-          
+
           <div className="space-y-3 max-h-80 overflow-y-auto border rounded-lg p-3">
             {demographics.map(demo => (
               <div
@@ -159,10 +182,10 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
             ))}
           </div>
         </div>
-        
+
         <div className="bg-indigo-50 rounded-lg p-4 mb-6">
-          <h3 className="font-medium text-indigo-800 mb-2">Simulation Summary</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <h3 className="font-medium text-indigo-800 mb-2">A/B Testing Summary</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="text-gray-600">Selected Demographics:</span>
               <span className="ml-2 font-medium">
@@ -170,13 +193,23 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
               </span>
             </div>
             <div>
-              <span className="text-gray-600">Simulations per Demographic:</span>
+              <span className="text-gray-600">Test Variants:</span>
+              <span className="ml-2 font-medium">{productVariants.length}</span>
+            </div>
+            <div>
+              <span className="text-gray-600">Sims per Demo/Variant:</span>
               <span className="ml-2 font-medium">{config.simulationsPerDemographic}</span>
             </div>
             <div>
               <span className="text-gray-600">Total Simulations:</span>
-              <span className="ml-2 font-medium">{totalSimulations}</span>
+              <span className="ml-2 font-medium">{totalSimulations.toLocaleString()}</span>
             </div>
+          </div>
+          <div className="mt-3 text-sm">
+            <span className="text-gray-600">Testing Matrix:</span>
+            <span className="ml-2 font-medium">
+              {config.selectedDemographics.length} demographics × {productVariants.length} variants × {config.simulationsPerDemographic} simulations each
+            </span>
           </div>
           <div className="mt-2 text-sm">
             <span className="text-gray-600">Estimated Time:</span>
@@ -187,7 +220,18 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
             </span>
           </div>
         </div>
-        
+
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+          <h3 className="font-medium text-yellow-800 mb-2">📊 What You'll Get</h3>
+          <ul className="text-sm text-yellow-700 space-y-1">
+            <li>• Performance comparison across all {productVariants.length} variants</li>
+            <li>• Demographic-specific responses for each variant</li>
+            <li>• Best performing variant identification</li>
+            <li>• Engagement and conversion rates by demographic</li>
+            <li>• Statistical significance of differences between variants</li>
+          </ul>
+        </div>
+
         <div className="flex justify-between">
           <button
             type="button"
@@ -196,14 +240,14 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
           >
             Back to Demographics
           </button>
-          
+
           <button
             type="button"
             onClick={() => onStartSimulation(config)}
             disabled={!isConfigValid}
             className={`btn-primary ${!isConfigValid ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            Start Simulation
+            Start A/B Testing
           </button>
         </div>
       </div>
