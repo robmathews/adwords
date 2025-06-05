@@ -17,7 +17,7 @@ interface SuggestionResponse {
 }
 
 export const InputForm: React.FC<InputFormProps> = ({ onSubmit }) => {
-  const [initialProductDescription, setInitialProductDescription] = useState('Baseball caps based on video game characters');
+  const [initialProductDescription, setInitialProductDescription] = useState('Baseball caps based on video game characters. concentrate on anime and manga characters.');
   const [targetMarket, setTargetMarket] = useState('Video gamers');
   const [suggestions, setSuggestions] = useState<SuggestionResponse | null>(null);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
