@@ -135,25 +135,25 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">
-                  +{comparison.conversionImprovement.toFixed(1)}%
+                  +{comparison?.conversionImprovement?.toFixed(1)}%
                 </div>
                 <div className="text-sm text-green-700">Conversion Improvement</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">
-                  +{comparison.engagementImprovement.toFixed(1)}%
+                  +{comparison?.engagementImprovement?.toFixed(1)}%
                 </div>
                 <div className="text-sm text-blue-700">Engagement Improvement</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-purple-600">
-                  {comparison.relativeConversionImprovement > 0 ? '+' : ''}{comparison.relativeConversionImprovement.toFixed(1)}%
+                  {comparison?.relativeConversionImprovement > 0 ? '+' : ''}{comparison?.relativeConversionImprovement.toFixed(1)}%
                 </div>
                 <div className="text-sm text-purple-700">Relative Conv. Gain</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">
-                  {comparison.relativeEngagementImprovement > 0 ? '+' : ''}{comparison.relativeEngagementImprovement.toFixed(1)}%
+                  {comparison?.relativeEngagementImprovement > 0 ? '+' : ''}{comparison?.relativeEngagementImprovement.toFixed(1)}%
                 </div>
                 <div className="text-sm text-orange-700">Relative Eng. Gain</div>
               </div>
@@ -167,13 +167,13 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-red-600">
-                  {comparison.conversionImprovement.toFixed(1)}%
+                  {comparison?.conversionImprovement?.toFixed(1)}%
                 </div>
                 <div className="text-sm text-red-700">Conversion Change</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-red-600">
-                  {comparison.engagementImprovement.toFixed(1)}%
+                  {comparison?.engagementImprovement?.toFixed(1)}%
                 </div>
                 <div className="text-sm text-red-700">Engagement Change</div>
               </div>
