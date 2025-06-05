@@ -2,6 +2,12 @@ import React, { useMemo } from 'react';
 import { Demographics, SimulationResult } from '../App';
 import { ProductVariant } from './InputForm';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import {
+  calculateStatisticalSignificance,
+  formatPValue,
+  getSignificanceStyles,
+  type VariantData
+} from '../utils/Statistics';
 
 interface ResultsDisplayProps {
   results: SimulationResult[];
@@ -102,19 +108,6 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
     });
   }, [results, demographics, productVariants]);
 
-  // Calculate statistical significance (simplified)
-  const calculateSignificance = (variant1: any, variant2: any) => {
-    // This is a simplified version - in production you'd use proper statistical tests
-    const diff = Math.abs(variant1.conversionRate - variant2.conversionRate);
-    const avgRate = (variant1.conversionRate + variant2.conversionRate) / 2;
-    const relativeImprovement = avgRate > 0 ? (diff / avgRate) * 100 : 0;
-
-    return {
-      improvement: relativeImprovement,
-      isSignificant: relativeImprovement > 20 && Math.min(variant1.totalResponses, variant2.totalResponses) > 50
-    };
-  };
-
   // Custom tooltip for charts
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -210,41 +203,99 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
         </div>
       </div>
 
-      {/* Statistical Significance */}
+      {/* Enhanced Statistical Significance */}
       {variantPerformance.length > 1 && (
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h3 className="text-xl font-semibold mb-4">Statistical Analysis</h3>
-          <div className="space-y-3">
+          <div className="space-y-4">
             {variantPerformance.slice(0, -1).map((vp1, i) =>
               variantPerformance.slice(i + 1).map((vp2, j) => {
-                const significance = calculateSignificance(vp1!, vp2!);
+                const variant1Data: VariantData = {
+                  totalConversions: vp1!.totalConversions,
+                  totalResponses: vp1!.totalResponses,
+                  conversionRate: vp1!.conversionRate
+                };
+
+                const variant2Data: VariantData = {
+                  totalConversions: vp2!.totalConversions,
+                  totalResponses: vp2!.totalResponses,
+                  conversionRate: vp2!.conversionRate
+                };
+
+                const stats = calculateStatisticalSignificance(variant1Data, variant2Data);
+
                 return (
-                  <div key={`${i}-${j}`} className="border rounded p-3">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">
-                        Variant {i + 1} vs Variant {i + j + 2}
+                  <div key={`${i}-${j}`} className="border rounded-lg p-4 bg-gray-50">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h4 className="font-medium text-lg">
+                          Variant {i + 1} vs Variant {i + j + 2}
+                        </h4>
+                        <p className="text-sm text-gray-600">
+                          Sample sizes: {stats.sampleSizes.variant1.toLocaleString()} vs {stats.sampleSizes.variant2.toLocaleString()}
+                        </p>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${getSignificanceStyles(stats.significanceLevel)}`}>
+                        {stats.significanceText}
                       </span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm">
-                          {significance.improvement.toFixed(1)}% difference
-                        </span>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          significance.isSignificant
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {significance.isSignificant ? 'Significant' : 'Not Significant'}
-                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mb-3">
+                      <div>
+                        <span className="text-gray-600">Relative Improvement:</span>
+                        <p className="font-medium text-lg">
+                          {stats.relativeImprovement.toFixed(1)}%
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Absolute Difference:</span>
+                        <p className="font-medium text-lg">
+                          {stats.absoluteDifference.toFixed(2)}%
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">P-value:</span>
+                        <p className="font-medium text-lg">
+                          {formatPValue(stats.pValue)}
+                        </p>
                       </div>
                     </div>
+
+                    <div className="text-sm">
+                      <span className="text-gray-600">95% Confidence Interval for difference:</span>
+                      <p className="font-medium">
+                        {stats.confidenceInterval.lower.toFixed(2)}% to {stats.confidenceInterval.upper.toFixed(2)}%
+                      </p>
+                    </div>
+
+                    {!stats.hasMinimumSample && (
+                      <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                        ⚠️ Sample size may be too small for reliable statistical analysis. Consider running more simulations.
+                      </div>
+                    )}
+
+                    {stats.significanceLevel === 'highly-significant' || stats.significanceLevel === 'significant' ? (
+                      <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                        🎯 <strong>Variant {stats.winningVariant === 1 ? i + 1 : i + j + 2}</strong> is the statistically significant winner!
+                      </div>
+                    ) : null}
                   </div>
                 );
               })
             )}
           </div>
-          <p className="text-xs text-gray-500 mt-3">
-            Statistical significance is simplified. For production use, consider proper A/B testing statistical methods.
-          </p>
+
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded">
+            <h4 className="font-medium text-blue-800 mb-2">Statistical Notes:</h4>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li>• P-value &lt; 0.05 indicates statistical significance at 95% confidence</li>
+              <li>• P-value &lt; 0.01 indicates high statistical significance at 99% confidence</li>
+              <li>• Relative improvement shows the percentage increase of the better variant</li>
+              <li>• Confidence intervals show the range of likely true differences</li>
+              <li>• Minimum 30 samples per variant recommended for reliable results</li>
+              <li>• Z-test for two proportions is used to compare conversion rates</li>
+            </ul>
+          </div>
         </div>
       )}
 
@@ -342,6 +393,7 @@ export const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
             return null;
           })()}
 
+          <p>• Check the statistical analysis above for confidence levels and significance testing results</p>
           <p>• Consider running the winning variant for 2-4 weeks to confirm these results in real-world conditions</p>
           <p>• Monitor performance metrics closely and be prepared to adjust based on actual campaign data</p>
         </div>
