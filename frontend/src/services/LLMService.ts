@@ -28,6 +28,13 @@ export interface ProductSuggestionResponse {
   taglines: string[];
 }
 
+// New interface for single optimized suggestion
+export interface OptimizedSuggestion {
+  productDescription: string;
+  tagline: string;
+  reasoning: string;
+}
+
 // Backend API URL
 const API_BASE_URL = import.meta.env.PROD
   ? '/api'  // In production (Heroku), use relative path
@@ -38,15 +45,15 @@ const API_BASE_URL = import.meta.env.PROD
  */
 export class LLMService {
   /**
-   * Generate product description and tagline suggestions for A/B testing
+   * Generate a single optimized suggestion for iterative testing
    */
-  static async generateProductSuggestions(
+  static async generateOptimizedSuggestion(
     params: ProductSuggestionParams
-  ): Promise<ProductSuggestionResponse> {
-    console.log('Requesting product suggestions with params:', params);
+  ): Promise<OptimizedSuggestion> {
+    console.log('Requesting optimized suggestion with params:', params);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/suggestions/generate`, {
+      const response = await fetch(`${API_BASE_URL}/suggestions/optimized`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -56,26 +63,84 @@ export class LLMService {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to generate suggestions');
+        throw new Error(errorData.message || 'Failed to generate optimized suggestion');
       }
 
       const data = await response.json();
-      return data.data as ProductSuggestionResponse;
+      return data.data as OptimizedSuggestion;
     } catch (error) {
-      console.error('Error generating suggestions:', error);
-      // Return fallback suggestions in case of an error
+      console.error('Error generating optimized suggestion:', error);
+      // Return fallback suggestion in case of an error
+      return {
+        productDescription: `Enhanced ${params.productDescription.toLowerCase()} designed specifically for ${params.targetMarket.toLowerCase()} who demand quality and style.`,
+        tagline: 'Experience the difference',
+        reasoning: 'Used emotional appeal and quality emphasis to create desire.'
+      };
+    }
+  }
+
+  /**
+   * Generate product description and tagline suggestions for A/B testing
+   * (keeping for backward compatibility)
+   */
+  static async generateProductSuggestions(
+    params: ProductSuggestionParams
+  ): Promise<ProductSuggestionResponse> {
+    console.log('Requesting product suggestions with params:', params);
+
+    try {
+      // First try the optimized suggestion endpoint
+      const optimizedSuggestion = await this.generateOptimizedSuggestion(params);
+
+      // Return it in the expected multi-suggestion format
       return {
         productDescriptions: [
-          params.productDescription,
-          `Premium ${params.productDescription.toLowerCase()}`,
-          `High-quality ${params.productDescription.toLowerCase()} for ${params.targetMarket.toLowerCase()}`
+          optimizedSuggestion.productDescription,
+          params.productDescription, // Original as fallback
+          `Premium ${params.productDescription.toLowerCase()} for ${params.targetMarket.toLowerCase()}`
         ],
         taglines: [
-          'Wear your favorite character',
-          'Level up your style',
-          'Game on with premium gear'
+          optimizedSuggestion.tagline,
+          'Experience excellence',
+          'Premium quality guaranteed'
         ]
       };
+    } catch (error) {
+      console.error('Error generating suggestions, falling back to original endpoint:', error);
+
+      // Fallback to original suggestions endpoint
+      try {
+        const response = await fetch(`${API_BASE_URL}/suggestions/generate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(params),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to generate suggestions');
+        }
+
+        const data = await response.json();
+        return data.data as ProductSuggestionResponse;
+      } catch (fallbackError) {
+        console.error('Error with fallback suggestions:', fallbackError);
+        // Return hardcoded fallback suggestions
+        return {
+          productDescriptions: [
+            params.productDescription,
+            `Premium ${params.productDescription.toLowerCase()}`,
+            `High-quality ${params.productDescription.toLowerCase()} for ${params.targetMarket.toLowerCase()}`
+          ],
+          taglines: [
+            'Wear your favorite character',
+            'Level up your style',
+            'Game on with premium gear'
+          ]
+        };
+      }
     }
   }
 

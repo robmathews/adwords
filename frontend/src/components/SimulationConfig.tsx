@@ -24,6 +24,7 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
     simulationsPerDemographic: 10,
     selectedDemographics: demographics.map(d => d.id) // Select all by default
   });
+  const [showDemographics, setShowDemographics] = useState(false);
 
   // Handle changing the simulation count
   const handleSimCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -131,56 +132,84 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
             <label className="block text-sm font-medium text-gray-700">
               Demographics to Include in Testing
             </label>
-            <div className="flex space-x-2 text-sm">
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-600">
+                {config.selectedDemographics.length} of {demographics.length} selected
+              </span>
               <button
                 type="button"
-                onClick={() => handleSelectAll(true)}
-                className="text-indigo-600 hover:text-indigo-800"
+                onClick={() => setShowDemographics(!showDemographics)}
+                className="flex items-center text-indigo-600 hover:text-indigo-800 text-sm font-medium"
               >
-                Select All
-              </button>
-              <span className="text-gray-300">|</span>
-              <button
-                type="button"
-                onClick={() => handleSelectAll(false)}
-                className="text-indigo-600 hover:text-indigo-800"
-              >
-                Deselect All
+                {showDemographics ? 'Hide Details' : 'Show Details'}
+                <svg
+                  className={`ml-1 w-4 h-4 transition-transform ${showDemographics ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
             </div>
           </div>
 
-          <div className="space-y-3 max-h-80 overflow-y-auto border rounded-lg p-3">
-            {demographics.map(demo => (
-              <div
-                key={demo.id}
-                className={`flex items-center p-2 rounded-lg transition-colors ${
-                  config.selectedDemographics.includes(demo.id)
-                    ? 'bg-indigo-50 border border-indigo-100'
-                    : 'bg-gray-50 border border-gray-100'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  id={`demo-${demo.id}`}
-                  checked={config.selectedDemographics.includes(demo.id)}
-                  onChange={() => handleToggleDemographic(demo.id)}
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                />
-                <label
-                  htmlFor={`demo-${demo.id}`}
-                  className="ml-3 flex-grow cursor-pointer"
-                >
-                  <span className="block font-medium text-gray-700">
-                    {demo.age} {demo.gender}
-                  </span>
-                  <span className="block text-sm text-gray-500">
-                    {demo.description.substring(0, 60)}...
-                  </span>
-                </label>
+          {showDemographics && (
+            <div className="border rounded-lg p-3 bg-gray-50">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-sm font-medium text-gray-700">Select demographics:</span>
+                <div className="flex space-x-2 text-sm">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectAll(true)}
+                    className="text-indigo-600 hover:text-indigo-800"
+                  >
+                    Select All
+                  </button>
+                  <span className="text-gray-300">|</span>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectAll(false)}
+                    className="text-indigo-600 hover:text-indigo-800"
+                  >
+                    Deselect All
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
+
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {demographics.map(demo => (
+                  <div
+                    key={demo.id}
+                    className={`flex items-center p-2 rounded-lg transition-colors ${
+                      config.selectedDemographics.includes(demo.id)
+                        ? 'bg-indigo-50 border border-indigo-100'
+                        : 'bg-white border border-gray-100'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      id={`demo-${demo.id}`}
+                      checked={config.selectedDemographics.includes(demo.id)}
+                      onChange={() => handleToggleDemographic(demo.id)}
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                    <label
+                      htmlFor={`demo-${demo.id}`}
+                      className="ml-3 flex-grow cursor-pointer"
+                    >
+                      <span className="block font-medium text-gray-700">
+                        {demo.age} {demo.gender}
+                      </span>
+                      <span className="block text-sm text-gray-500">
+                        {demo.description.substring(0, 60)}...
+                      </span>
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="bg-indigo-50 rounded-lg p-4 mb-6">

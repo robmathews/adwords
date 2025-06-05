@@ -36,6 +36,13 @@ export interface ProductSuggestionResponse {
   taglines: string[];
 }
 
+// Add new interface for single suggestion
+export interface OptimizedSuggestion {
+  productDescription: string;
+  tagline: string;
+  reasoning: string;
+}
+
 // Retry configuration
 interface RetryConfig {
   maxRetries: number;
@@ -131,7 +138,89 @@ async function withRetry<T>(
 }
 
 /**
+ * Generate a single optimized suggestion for iterative testing
+ */
+export async function generateOptimizedSuggestion(
+  params: ProductSuggestionParams
+): Promise<OptimizedSuggestion> {
+  console.log('Generating optimized suggestion with params:', params);
+
+  return withRetry(async () => {
+    const response = await anthropic.messages.create({
+      model: "claude-3-5-haiku-latest",
+      max_tokens: 800,
+      system: "You are an expert marketing copywriter specializing in conversion optimization and persuasive advertising.",
+      messages: [
+        {
+          role: "user",
+          content: `Create a single, highly optimized version of the following product for maximum conversion potential:
+
+          Original Product Description: ${params.productDescription}
+          Target Market: ${params.targetMarket}
+
+          Your goal is to create a version that will outperform the original by:
+          - Using psychological triggers that appeal to the target market
+          - Emphasizing emotional benefits over features
+          - Creating urgency or desire
+          - Using power words and persuasive language
+          - Addressing potential objections
+          - Making the value proposition crystal clear
+
+          Focus on conversion optimization principles like:
+          - Social proof implications
+          - Scarcity/exclusivity
+          - Emotional resonance
+          - Clear value proposition
+          - Action-oriented language
+
+          Return your response in the following JSON format:
+          {
+            "productDescription": "Your optimized 2-3 sentence product description that's more compelling than the original",
+            "tagline": "A powerful 4-8 word tagline that captures the essence and creates desire",
+            "reasoning": "Brief 1-2 sentence explanation of the optimization strategy you used"
+          }
+
+          Make sure the optimized version maintains the core product concept while significantly enhancing its persuasive appeal for the target market.
+
+          Return only the JSON with no additional text.`
+        }
+      ],
+      temperature: 0.8,
+    });
+
+    // Extract text content from the response
+    let jsonContent = '';
+
+    // The content is an array of content blocks
+    if (response.content && Array.isArray(response.content)) {
+      // Find the first text block
+      for (const block of response.content) {
+        if (block.type === 'text') {
+          jsonContent = block.text;
+          break;
+        }
+      }
+    }
+
+    if (!jsonContent) {
+      throw new Error('No valid text content found in the response');
+    }
+
+    // Parse the response content to extract the suggestion JSON
+    try {
+      const suggestion = JSON.parse(jsonContent) as OptimizedSuggestion;
+      return suggestion;
+    } catch (parseError) {
+      console.error('Failed to parse suggestion JSON:', parseError);
+      console.error('Raw response:', jsonContent);
+      throw new Error('Failed to parse optimized suggestion from LLM response');
+    }
+  });
+}
+
+/**
  * Generate product description and tagline suggestions for A/B testing using Claude
+ * (keeping this for backward compatibility)
  */
 export async function generateProductSuggestions(
   params: ProductSuggestionParams
