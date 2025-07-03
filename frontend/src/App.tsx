@@ -237,6 +237,28 @@ function App() {
     setRecentResponses([]);
   };
 
+  // Handle complete reset - clear everything including saved runs
+  const handleResetComparison = () => {
+    // Clear all state
+    setLastRun(null);
+    setCurrentRun(null);
+    setCurrentStep('suggestion');
+    setDemographics([]);
+    setSimulationConfig(null);
+    setSimulationsCompleted(0);
+    setTotalSimulations(0);
+    setCurrentDemographicId(null);
+    setCurrentVariantId(null);
+    setRecentResponses([]);
+
+    // Clear localStorage
+    localStorage.removeItem('adwords_last_run');
+
+    // Reset to default values
+    setInitialProductDescription('Baseball caps based on video game characters. concentrate on anime and manga characters.');
+    setTargetMarket('Video gamers');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <Navbar />
@@ -350,6 +372,7 @@ function App() {
               lastRun={lastRun}
               onContinueWithCurrentRun={handleContinueWithCurrentRun}
               onStartFresh={handleStartFresh}
+              onResetComparison={handleResetComparison}
             />
           )}
         </div>

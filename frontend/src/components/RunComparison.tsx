@@ -13,13 +13,15 @@ interface RunComparisonProps {
   lastRun: TestRun | null;
   onContinueWithCurrentRun: () => void;
   onStartFresh: () => void;
+  onResetComparison: () => void; // New prop for reset functionality
 }
 
 export const RunComparison: React.FC<RunComparisonProps> = ({
   currentRun,
   lastRun,
   onContinueWithCurrentRun,
-  onStartFresh
+  onStartFresh,
+  onResetComparison
 }) => {
   // Determine which run performed better
   const comparison = useMemo(() => {
@@ -28,14 +30,14 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
 
     const conversionImprovement = currentRun.conversionRate - lastRun.conversionRate;
     const engagementImprovement = currentRun.engagementRate - lastRun.engagementRate;
-    
+
     return {
       conversionImprovement,
       engagementImprovement,
       isCurrentBetter: conversionImprovement > 0,
-      relativeConversionImprovement: lastRun.conversionRate > 0 ? 
+      relativeConversionImprovement: lastRun.conversionRate > 0 ?
         (conversionImprovement / lastRun.conversionRate) * 100 : 0,
-      relativeEngagementImprovement: lastRun.engagementRate > 0 ? 
+      relativeEngagementImprovement: lastRun.engagementRate > 0 ?
         (engagementImprovement / lastRun.engagementRate) * 100 : 0
     };
   }, [currentRun, lastRun]);
@@ -47,7 +49,7 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
     // Calculate total conversions and responses for each run
     const currentTotalResponses = currentRun.results.reduce((sum, r) => sum + r.totalSims, 0);
     const currentTotalConversions = currentRun.results.reduce((sum, r) => sum + r.responses.followAndBuy, 0);
-    
+
     const lastTotalResponses = lastRun.results.reduce((sum, r) => sum + r.totalSims, 0);
     const lastTotalConversions = lastRun.results.reduce((sum, r) => sum + r.responses.followAndBuy, 0);
 
@@ -69,7 +71,7 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
   // Prepare data for comparison chart
   const chartData = useMemo(() => {
     if (!currentRun) return [];
-    
+
     const data = [
       {
         name: 'Current Run',
@@ -93,20 +95,40 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
     return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const handleResetComparison = () => {
+    if (window.confirm('Are you sure you want to reset the comparison?')) {
+      onResetComparison();
+    }
+  };
+
   if (!currentRun) return null;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      {/* Header with Reset Button */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Test Results</h1>
+        <button
+          onClick={handleResetComparison}
+          className="flex items-center px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:border-red-300 transition-colors"
+        >
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Reset All Tests
+        </button>
+      </div>
+
       {/* Results Summary */}
       <div className={`rounded-lg p-6 border-2 ${
         comparison === 'first_run' ? 'bg-blue-50 border-blue-200' :
-        comparison?.isCurrentBetter ? 'bg-green-50 border-green-200' : 
+        comparison?.isCurrentBetter ? 'bg-green-50 border-green-200' :
         'bg-orange-50 border-orange-200'
       }`}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold">
             {comparison === 'first_run' ? '🎉 First Test Complete!' :
-             comparison?.isCurrentBetter ? '🏆 New Best Performance!' : 
+             comparison?.isCurrentBetter ? '🏆 New Best Performance!' :
              '📊 Test Complete - No Improvement'}
           </h2>
         </div>
@@ -306,7 +328,7 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
       {/* Action Buttons */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <h3 className="text-lg font-semibold mb-4">Next Steps</h3>
-        
+
         {comparison === 'first_run' || comparison?.isCurrentBetter ? (
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded p-4">
@@ -314,7 +336,7 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
                 {comparison === 'first_run' ? 'Set as Baseline' : 'New Best Performance!'}
               </h4>
               <p className="text-blue-700 text-sm mb-3">
-                {comparison === 'first_run' 
+                {comparison === 'first_run'
                   ? 'This run will become your baseline for future comparisons. Continue testing to find even better variations.'
                   : 'This run has outperformed your previous best. Save it as your new baseline and continue optimizing.'
                 }
@@ -326,7 +348,7 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
                 {comparison === 'first_run' ? 'Set as Baseline & Continue' : 'Save as New Best & Continue'}
               </button>
             </div>
-            
+
             <div className="bg-gray-50 border border-gray-200 rounded p-4">
               <h4 className="font-medium text-gray-800 mb-2">Start Fresh</h4>
               <p className="text-gray-700 text-sm mb-3">
@@ -356,6 +378,22 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
             </div>
           </div>
         )}
+
+        {/* Reset Option */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <div className="bg-red-50 border border-red-200 rounded p-4">
+            <h4 className="font-medium text-red-800 mb-2">Complete Reset</h4>
+            <p className="text-red-700 text-sm mb-3">
+              Clear all test history and start completely fresh. This will remove all saved baselines and test runs.
+            </p>
+            <button
+              onClick={handleResetComparison}
+              className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+            >
+              Reset All Tests
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
