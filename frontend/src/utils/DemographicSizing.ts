@@ -1,7 +1,7 @@
 // frontend/src/utils/DemographicSizing.ts
 // Utility for estimating demographic market sizes
 
-import { Demographics } from '../types';
+import { Demographics, SimulationResult } from '../types';
 
 // US demographic data (in thousands) - based on census estimates
 const US_DEMOGRAPHIC_SIZES = {
