@@ -8,7 +8,7 @@ import { LeaderboardService } from '../services/LeaderboardService';
 
 interface SuggestionFormProps {
   initialProductDescription: string;
-  tagline: string;
+  initialTagline: string;
   targetMarket: string;
   salesPrice: number;
   unitCost: number;
@@ -23,6 +23,7 @@ interface SuggestionFormProps {
 
 interface Suggestion {
   productDescription: string;
+  targetMarket: string;
   tagline: string;
   salesPrice: number;
   unitCost: number;
@@ -65,6 +66,7 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
     const newErrors = {
       productDescription: productDescription.trim() === '' ? 'Product description is required' : '',
       targetMarket: market.trim() === '' ? 'Target market is required' : '',
+      tagline: tagline.trim() === '' ? 'Tagline is required' : '',
       salesPrice: currentSalesPrice <= 0 ? 'Sales price must be greater than 0' : '',
       unitCost: currentUnitCost < 0 ? 'Unit cost cannot be negative' :
                 currentUnitCost >= currentSalesPrice ? 'Unit cost must be less than sales price' : '',
@@ -93,6 +95,7 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
       // Take the first (emotional appeal) suggestion and add current pricing
       const newSuggestion: Suggestion = {
         productDescription: suggestions.productDescriptions[0] || productDescription,
+        targetMarket: market,
         tagline: suggestions.taglines[0] || 'Discover something amazing',
         salesPrice: currentSalesPrice,
         unitCost: currentUnitCost
@@ -106,6 +109,7 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
       // Create a fallback suggestion
       const fallbackSuggestion: Suggestion = {
         productDescription: productDescription,
+        targetMarket: market,
         tagline: 'Discover something amazing',
         salesPrice: currentSalesPrice,
         unitCost: currentUnitCost
@@ -124,7 +128,7 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
     setCurrentSalesPrice(productSugg.salesPrice);
     setCurrentUnitCost(productSugg.unitCost);
 
-    onUpdateInitialData(productSugg.productDescription, productSugg.targetMarket);
+    onUpdateInitialData(productSugg.productDescription, productSugg.targetMarket, productSugg.tagline);
     onUpdatePricing(productSugg.salesPrice, productSugg.unitCost);
 
     setShowQuickStart(false);
@@ -151,7 +155,7 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
     if (finalSuggestion) {
       onAcceptSuggestion(
         finalSuggestion.productDescription,
-        finalSuggestion.market,
+        finalSuggestion.targetMarket,
         finalSuggestion.tagline,
         finalSuggestion.salesPrice,
         finalSuggestion.unitCost

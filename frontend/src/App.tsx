@@ -453,7 +453,7 @@ function App() {
               onAcceptSuggestion={handleAcceptSuggestion}
               onUpdateInitialData={(productDesc, tagline, market) => {
                 setInitialProductDescription(productDesc);
-                setTagline(tagline);
+                setInitialTagline(tagline);
                 setTargetMarket(market);
               }}
               onUpdatePricing={handleUpdatePricing}
