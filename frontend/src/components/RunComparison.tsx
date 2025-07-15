@@ -1,6 +1,10 @@
-import React, { useMemo } from 'react';
+// frontend/src/components/RunComparison.tsx
+// Fixed RunComparison component - removed async function calls from render
+
+import React, { useMemo, useState, useEffect } from 'react';
 import { TestRun } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LeaderboardService } from '../services/LeaderboardService';
 import {
   calculateStatisticalSignificance,
   formatPValue,
@@ -11,30 +15,77 @@ import {
 interface RunComparisonProps {
   currentRun: TestRun | null;
   lastRun: TestRun | null;
+  playerName: string;
   onContinueWithCurrentRun: () => void;
   onStartFresh: () => void;
-  onResetComparison: () => void; // New prop for reset functionality
+  onSaveToLeaderboard: () => void;
+  onViewLeaderboard: () => void;
+  isSavingToLeaderboard?: boolean;
 }
 
 export const RunComparison: React.FC<RunComparisonProps> = ({
   currentRun,
   lastRun,
+  playerName,
   onContinueWithCurrentRun,
   onStartFresh,
-  onResetComparison
+  onSaveToLeaderboard,
+  onViewLeaderboard,
+  isSavingToLeaderboard
 }) => {
+  // State for async leaderboard data
+  const [qualifiesForLeaderboard, setQualifiesForLeaderboard] = useState<boolean>(false);
+  const [potentialRank, setPotentialRank] = useState<number | null>(null);
+  const [performanceCategory, setPerformanceCategory] = useState<any>(null);
+
+  // Load leaderboard qualification data
+  useEffect(() => {
+    const loadLeaderboardData = async () => {
+      if (!currentRun) return;
+
+      try {
+        // These are the async calls that were causing the Promise rendering issue
+        const [qualifies, rank] = await Promise.all([
+          LeaderboardService.qualifiesForLeaderboard(currentRun.totalRevenue),
+          LeaderboardService.getScoreRank(currentRun.totalRevenue)
+        ]);
+
+        setQualifiesForLeaderboard(qualifies);
+        setPotentialRank(rank);
+
+        // This one is synchronous, so it's safe
+        setPerformanceCategory(LeaderboardService.getPerformanceCategory(currentRun.totalRevenue));
+      } catch (error) {
+        console.error('Error loading leaderboard data:', error);
+        setQualifiesForLeaderboard(false);
+        setPotentialRank(null);
+        setPerformanceCategory(currentRun ? LeaderboardService.getPerformanceCategory(currentRun.totalRevenue) : null);
+      }
+    };
+
+    loadLeaderboardData();
+  }, [currentRun]);
+
   // Determine which run performed better
   const comparison = useMemo(() => {
     if (!currentRun) return null;
     if (!lastRun) return 'first_run';
 
+    const revenueImprovement = currentRun.totalRevenue - lastRun.totalRevenue;
+    const profitImprovement = currentRun.totalProfit - lastRun.totalProfit;
     const conversionImprovement = currentRun.conversionRate - lastRun.conversionRate;
     const engagementImprovement = currentRun.engagementRate - lastRun.engagementRate;
 
     return {
+      revenueImprovement,
+      profitImprovement,
       conversionImprovement,
       engagementImprovement,
-      isCurrentBetter: conversionImprovement > 0,
+      isCurrentBetter: revenueImprovement > 0, // Revenue is the primary metric for tycoon score
+      relativeRevenueImprovement: lastRun.totalRevenue > 0 ?
+        (revenueImprovement / lastRun.totalRevenue) * 100 : 0,
+      relativeProfitImprovement: lastRun.totalProfit > 0 ?
+        (profitImprovement / lastRun.totalProfit) * 100 : 0,
       relativeConversionImprovement: lastRun.conversionRate > 0 ?
         (conversionImprovement / lastRun.conversionRate) * 100 : 0,
       relativeEngagementImprovement: lastRun.engagementRate > 0 ?
@@ -68,13 +119,15 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
     return calculateStatisticalSignificance(currentData, lastData);
   }, [currentRun, lastRun]);
 
-  // Prepare data for comparison chart
+  // Prepare data for comparison chart including revenue
   const chartData = useMemo(() => {
     if (!currentRun) return [];
 
     const data = [
       {
-        name: 'Current Run',
+        name: 'Current Campaign',
+        revenue: currentRun.totalRevenue,
+        profit: currentRun.totalProfit,
         conversion: currentRun.conversionRate,
         engagement: currentRun.engagementRate
       }
@@ -83,6 +136,8 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
     if (lastRun) {
       data.unshift({
         name: 'Previous Best',
+        revenue: lastRun.totalRevenue,
+        profit: lastRun.totalProfit,
         conversion: lastRun.conversionRate,
         engagement: lastRun.engagementRate
       });
@@ -95,143 +150,182 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
     return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const handleResetComparison = () => {
-    if (window.confirm('Are you sure you want to reset the comparison?')) {
-      onResetComparison();
-    }
-  };
-
   if (!currentRun) return null;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      {/* Header with Reset Button */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Test Results</h1>
-        <button
-          onClick={handleResetComparison}
-          className="flex items-center px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:border-red-300 transition-colors"
-        >
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-          Reset All Tests
-        </button>
-      </div>
-
-      {/* Results Summary */}
-      <div className={`rounded-lg p-6 border-2 ${
-        comparison === 'first_run' ? 'bg-blue-50 border-blue-200' :
-        comparison?.isCurrentBetter ? 'bg-green-50 border-green-200' :
-        'bg-orange-50 border-orange-200'
+      {/* Tycoon Results Summary */}
+      <div className={`rounded-2xl p-8 border-2 backdrop-blur-md ${
+        comparison === 'first_run' ? 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-400' :
+        comparison?.isCurrentBetter ? 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-green-400' :
+        'bg-gradient-to-r from-orange-500/20 to-red-500/20 border-orange-400'
       }`}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold">
-            {comparison === 'first_run' ? '🎉 First Test Complete!' :
-             comparison?.isCurrentBetter ? '🏆 New Best Performance!' :
-             '📊 Test Complete - No Improvement'}
+        <div className="text-center mb-6">
+          <h2 className="text-4xl font-bold mb-2 text-white">
+            {comparison === 'first_run' ? '🎉 Campaign Complete!' :
+             comparison?.isCurrentBetter ? '🏆 Revenue Champion!' :
+             '📊 Campaign Analysis'}
           </h2>
+          {performanceCategory && (
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <span className="text-2xl">{performanceCategory.emoji}</span>
+              <span className={`text-xl font-medium ${performanceCategory.color}`}>
+                {performanceCategory.title}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Main Revenue Display */}
+        <div className="text-center mb-8">
+          <div className="text-6xl font-bold text-yellow-400 mb-2">
+            {LeaderboardService.formatCurrency(currentRun.totalRevenue)}
+          </div>
+          <div className="text-xl text-gray-300 mb-4">Total Revenue (Tycoon Score)</div>
+
+          {qualifiesForLeaderboard && potentialRank && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/20 border border-yellow-400 rounded-full">
+              <span className="text-yellow-400 font-bold">
+                🏆 Leaderboard Rank #{potentialRank}
+              </span>
+            </div>
+          )}
         </div>
 
         {comparison === 'first_run' ? (
           <div>
-            <p className="text-lg mb-4">
-              Great! You've completed your first test run. This will serve as your baseline for future tests.
+            <p className="text-lg mb-6 text-center text-gray-300">
+              Congratulations! Your first campaign is complete. This will serve as your baseline for future campaigns.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               <div className="text-center">
-                <div className="text-3xl font-bold text-blue-600">{currentRun.conversionRate.toFixed(1)}%</div>
-                <div className="text-blue-700">Conversion Rate</div>
+                <div className="text-2xl font-bold text-green-400">
+                  {LeaderboardService.formatCurrency(currentRun.totalProfit)}
+                </div>
+                <div className="text-sm text-gray-400">Total Profit</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-green-600">{currentRun.engagementRate.toFixed(1)}%</div>
-                <div className="text-green-700">Engagement Rate</div>
+                <div className="text-2xl font-bold text-blue-400">
+                  {(currentRun.conversionRate * 100).toFixed(1)}%
+                </div>
+                <div className="text-sm text-gray-400">Conversion Rate</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-400">
+                  {(currentRun.engagementRate * 100).toFixed(1)}%
+                </div>
+                <div className="text-sm text-gray-400">Engagement Rate</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-indigo-400">
+                  {currentRun.demographics.length}
+                </div>
+                <div className="text-sm text-gray-400">Demographics</div>
               </div>
             </div>
           </div>
-        ) : comparison?.isCurrentBetter ? (
+        ) : comparison && (
           <div>
-            <p className="text-lg mb-4">
-              Excellent! Your new test outperformed the previous baseline.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  +{comparison?.conversionImprovement?.toFixed(1)}%
+                <div className={`text-2xl font-bold ${comparison.revenueImprovement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {comparison.revenueImprovement >= 0 ? '+' : ''}{LeaderboardService.formatCurrency(comparison.revenueImprovement)}
                 </div>
-                <div className="text-sm text-green-700">Conversion Improvement</div>
+                <div className="text-sm text-gray-400">Revenue Change</div>
+                {comparison.relativeRevenueImprovement !== 0 && (
+                  <div className={`text-xs ${comparison.relativeRevenueImprovement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    ({comparison.relativeRevenueImprovement >= 0 ? '+' : ''}{comparison.relativeRevenueImprovement.toFixed(1)}%)
+                  </div>
+                )}
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  +{comparison?.engagementImprovement?.toFixed(1)}%
+                <div className={`text-2xl font-bold ${comparison.profitImprovement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {comparison.profitImprovement >= 0 ? '+' : ''}{LeaderboardService.formatCurrency(comparison.profitImprovement)}
                 </div>
-                <div className="text-sm text-blue-700">Engagement Improvement</div>
+                <div className="text-sm text-gray-400">Profit Change</div>
+                {comparison.relativeProfitImprovement !== 0 && (
+                  <div className={`text-xs ${comparison.relativeProfitImprovement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    ({comparison.relativeProfitImprovement >= 0 ? '+' : ''}{comparison.relativeProfitImprovement.toFixed(1)}%)
+                  </div>
+                )}
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">
-                  {comparison?.relativeConversionImprovement > 0 ? '+' : ''}{comparison?.relativeConversionImprovement.toFixed(1)}%
+                <div className={`text-2xl font-bold ${comparison.conversionImprovement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {comparison.conversionImprovement >= 0 ? '+' : ''}{(comparison.conversionImprovement * 100).toFixed(1)}%
                 </div>
-                <div className="text-sm text-purple-700">Relative Conv. Gain</div>
+                <div className="text-sm text-gray-400">Conversion</div>
+                {comparison.relativeConversionImprovement !== 0 && (
+                  <div className={`text-xs ${comparison.relativeConversionImprovement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    ({comparison.relativeConversionImprovement >= 0 ? '+' : ''}{comparison.relativeConversionImprovement.toFixed(1)}%)
+                  </div>
+                )}
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">
-                  {comparison?.relativeEngagementImprovement > 0 ? '+' : ''}{comparison?.relativeEngagementImprovement.toFixed(1)}%
+                <div className={`text-2xl font-bold ${comparison.engagementImprovement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {comparison.engagementImprovement >= 0 ? '+' : ''}{(comparison.engagementImprovement * 100).toFixed(1)}%
                 </div>
-                <div className="text-sm text-orange-700">Relative Eng. Gain</div>
+                <div className="text-sm text-gray-400">Engagement</div>
+                {comparison.relativeEngagementImprovement !== 0 && (
+                  <div className={`text-xs ${comparison.relativeEngagementImprovement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    ({comparison.relativeEngagementImprovement >= 0 ? '+' : ''}{comparison.relativeEngagementImprovement.toFixed(1)}%)
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-        ) : (
-          <div>
-            <p className="text-lg mb-4">
-              This test didn't improve upon your previous best. The baseline remains unchanged.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+
+            {comparison?.isCurrentBetter ? (
               <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">
-                  {comparison?.conversionImprovement?.toFixed(1)}%
-                </div>
-                <div className="text-sm text-red-700">Conversion Change</div>
+                <p className="text-lg text-green-300 mb-2">
+                  🎉 Excellent! Your revenue increased by {comparison.relativeRevenueImprovement.toFixed(1)}%
+                </p>
+                <p className="text-gray-400">
+                  Keep building on this success to climb the leaderboard!
+                </p>
               </div>
+            ) : (
               <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">
-                  {comparison?.engagementImprovement?.toFixed(1)}%
-                </div>
-                <div className="text-sm text-red-700">Engagement Change</div>
+                <p className="text-lg text-orange-300 mb-2">
+                  📉 This campaign didn't outperform your previous best
+                </p>
+                <p className="text-gray-400">
+                  Analyze the results and try a different approach next time.
+                </p>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-gray-600">
-                  {lastRun?.conversionRate.toFixed(1)}%
-                </div>
-                <div className="text-sm text-gray-700">Best Conversion</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-gray-600">
-                  {lastRun?.engagementRate.toFixed(1)}%
-                </div>
-                <div className="text-sm text-gray-700">Best Engagement</div>
-              </div>
-            </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Statistical Analysis */}
-      {statisticalAnalysis && lastRun && (
+      {/* Statistical Analysis (only show when comparing two runs) */}
+      {statisticalAnalysis && comparison !== 'first_run' && (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h3 className="text-xl font-semibold mb-4">Statistical Analysis</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className={`p-4 rounded-lg ${getSignificanceStyles(statisticalAnalysis.significanceLevel)}`}>
-              <h4 className="font-medium mb-2">{statisticalAnalysis.significanceText}</h4>
-              <div className="text-sm space-y-1">
-                <p>P-value: {formatPValue(statisticalAnalysis.pValue)}</p>
-                <p>Sample sizes: {statisticalAnalysis.sampleSizes.variant1} vs {statisticalAnalysis.sampleSizes.variant2}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-medium mb-2">Statistical Significance</h4>
+              <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getSignificanceStyles(statisticalAnalysis.significanceLevel)}`}>
+                {statisticalAnalysis.significanceText}
+              </div>
+              <p className="text-sm text-gray-600 mt-2">
+                p-value: {formatPValue(statisticalAnalysis.pValue)}
+              </p>
+              <div className="mt-2 text-sm">
                 {statisticalAnalysis.hasMinimumSample ? (
                   <p>✅ Sufficient sample size for analysis</p>
                 ) : (
                   <p>⚠️ Sample size may be too small for reliable analysis</p>
                 )}
               </div>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-medium mb-2">Effect Size</h4>
+              <p className="text-2xl font-bold text-indigo-600">
+                {statisticalAnalysis.relativeImprovement > 0 ? '+' : ''}{statisticalAnalysis.relativeImprovement.toFixed(1)}%
+              </p>
+              <p className="text-sm text-gray-600">Relative improvement</p>
+              <p className="text-sm text-gray-600 mt-1">
+                {statisticalAnalysis.absoluteDifference > 0 ? '+' : ''}{(statisticalAnalysis.absoluteDifference * 100).toFixed(2)}% absolute
+              </p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg">
               <h4 className="font-medium mb-2">Confidence Interval</h4>
@@ -252,145 +346,92 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
-              <YAxis label={{ value: 'Rate (%)', angle: -90, position: 'insideLeft' }} />
-              <Tooltip />
+              <YAxis label={{ value: 'Value', angle: -90, position: 'insideLeft' }} />
+              <Tooltip formatter={(value, name) => {
+                if (name === 'revenue' || name === 'profit') {
+                  return [LeaderboardService.formatCurrency(value as number), name];
+                }
+                return [(value as number * 100).toFixed(1) + '%', name];
+              }} />
               <Legend />
-              <Bar dataKey="conversion" name="Conversion Rate" fill="#48BB78" />
-              <Bar dataKey="engagement" name="Engagement Rate" fill="#4299E1" />
+              <Bar dataKey="revenue" name="Revenue" fill="#F59E0B" />
+              <Bar dataKey="profit" name="Profit" fill="#10B981" />
+              <Bar dataKey="conversion" name="Conversion Rate" fill="#3B82F6" />
+              <Bar dataKey="engagement" name="Engagement Rate" fill="#8B5CF6" />
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
-
-      {/* Detailed Run Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Current Run Details */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <h3 className="text-lg font-semibold mb-4">Current Test Run</h3>
-          <div className="space-y-3">
-            <div>
-              <span className="text-gray-500 text-sm">Product Description:</span>
-              <p className="font-medium">{currentRun.productDescription}</p>
-            </div>
-            <div>
-              <span className="text-gray-500 text-sm">Tagline:</span>
-              <p className="font-medium">"{currentRun.tagline}"</p>
-            </div>
-            <div>
-              <span className="text-gray-500 text-sm">Run Date:</span>
-              <p>{formatDate(currentRun.timestamp)}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-4 pt-2">
-              <div>
-                <span className="text-gray-500 text-sm">Demographics:</span>
-                <p className="font-medium">{currentRun.demographics.length}</p>
-              </div>
-              <div>
-                <span className="text-gray-500 text-sm">Simulations:</span>
-                <p className="font-medium">{currentRun.results.reduce((sum, r) => sum + r.totalSims, 0)}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Previous Run Details */}
-        {lastRun && (
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">Previous Best Run</h3>
-            <div className="space-y-3">
-              <div>
-                <span className="text-gray-500 text-sm">Product Description:</span>
-                <p className="font-medium">{lastRun.productDescription}</p>
-              </div>
-              <div>
-                <span className="text-gray-500 text-sm">Tagline:</span>
-                <p className="font-medium">"{lastRun.tagline}"</p>
-              </div>
-              <div>
-                <span className="text-gray-500 text-sm">Run Date:</span>
-                <p>{formatDate(lastRun.timestamp)}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4 pt-2">
-                <div>
-                  <span className="text-gray-500 text-sm">Demographics:</span>
-                  <p className="font-medium">{lastRun.demographics.length}</p>
-                </div>
-                <div>
-                  <span className="text-gray-500 text-sm">Simulations:</span>
-                  <p className="font-medium">{lastRun.results.reduce((sum, r) => sum + r.totalSims, 0)}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Action Buttons */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <h3 className="text-lg font-semibold mb-4">Next Steps</h3>
 
-        {comparison === 'first_run' || comparison?.isCurrentBetter ? (
-          <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded p-4">
-              <h4 className="font-medium text-blue-800 mb-2">
-                {comparison === 'first_run' ? 'Set as Baseline' : 'New Best Performance!'}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Save to Leaderboard */}
+          {qualifiesForLeaderboard && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded p-4">
+              <h4 className="font-medium text-yellow-800 mb-2">
+                🏆 Leaderboard Qualification!
               </h4>
-              <p className="text-blue-700 text-sm mb-3">
-                {comparison === 'first_run'
-                  ? 'This run will become your baseline for future comparisons. Continue testing to find even better variations.'
-                  : 'This run has outperformed your previous best. Save it as your new baseline and continue optimizing.'
-                }
+              <p className="text-yellow-700 text-sm mb-3">
+                This campaign qualifies for the global leaderboard at rank #{potentialRank}!
               </p>
               <button
-                onClick={onContinueWithCurrentRun}
-                className="btn-primary"
+                onClick={onSaveToLeaderboard}
+                className="w-full btn-primary bg-yellow-600 hover:bg-yellow-700"
               >
-                {comparison === 'first_run' ? 'Set as Baseline & Continue' : 'Save as New Best & Continue'}
+                {isSavingToLeaderboard ? 'Saving...' : 'Save to Leaderboard'}
               </button>
             </div>
+          )}
 
-            <div className="bg-gray-50 border border-gray-200 rounded p-4">
-              <h4 className="font-medium text-gray-800 mb-2">Start Fresh</h4>
-              <p className="text-gray-700 text-sm mb-3">
-                Keep your current best run but start over with different product details.
-              </p>
-              <button
-                onClick={onStartFresh}
-                className="btn-secondary"
-              >
-                Start Fresh Test
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="bg-orange-50 border border-orange-200 rounded p-4">
-              <h4 className="font-medium text-orange-800 mb-2">Try Again</h4>
-              <p className="text-orange-700 text-sm mb-3">
-                This test didn't improve performance. Try another approach or adjust your strategy.
-              </p>
-              <button
-                onClick={onStartFresh}
-                className="btn-primary"
-              >
-                Try Different Approach
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Reset Option */}
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <div className="bg-red-50 border border-red-200 rounded p-4">
-            <h4 className="font-medium text-red-800 mb-2">Complete Reset</h4>
-            <p className="text-red-700 text-sm mb-3">
-              Clear all test history and start completely fresh. This will remove all saved baselines and test runs.
+          {/* Continue Testing */}
+          <div className="bg-blue-50 border border-blue-200 rounded p-4">
+            <h4 className="font-medium text-blue-800 mb-2">
+              {comparison === 'first_run' || comparison?.isCurrentBetter ? 'Continue Optimizing' : 'Keep Experimenting'}
+            </h4>
+            <p className="text-blue-700 text-sm mb-3">
+              {comparison === 'first_run'
+                ? 'Use this as your baseline and test new variations to improve performance.'
+                : comparison?.isCurrentBetter
+                ? 'Build on this success by testing more variations.'
+                : 'Try different approaches to beat your previous best.'
+              }
             </p>
             <button
-              onClick={handleResetComparison}
-              className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+              onClick={onContinueWithCurrentRun}
+              className="w-full btn-primary"
             >
-              Reset All Tests
+              Continue Testing
+            </button>
+          </div>
+
+          {/* Start Fresh */}
+          <div className="bg-gray-50 border border-gray-200 rounded p-4">
+            <h4 className="font-medium text-gray-800 mb-2">New Campaign</h4>
+            <p className="text-gray-700 text-sm mb-3">
+              Start over with a different product or target market.
+            </p>
+            <button
+              onClick={onStartFresh}
+              className="w-full btn-secondary"
+            >
+              Start New Campaign
+            </button>
+          </div>
+
+          {/* View Leaderboard */}
+          <div className="bg-purple-50 border border-purple-200 rounded p-4">
+            <h4 className="font-medium text-purple-800 mb-2">View Competition</h4>
+            <p className="text-purple-700 text-sm mb-3">
+              See how you stack up against other marketing tycoons.
+            </p>
+            <button
+              onClick={onViewLeaderboard}
+              className="w-full btn-secondary bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              View Leaderboard
             </button>
           </div>
         </div>

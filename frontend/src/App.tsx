@@ -1,3 +1,6 @@
+// frontend/src/App.tsx
+// Updated App component with AdWords Tycoon gamification features
+
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { SuggestionForm } from './components/SuggestionForm';
@@ -6,8 +9,12 @@ import { DemographicGeneration } from './components/DemographicGeneration';
 import { DemographicManager } from './components/DemographicManager';
 import { SimulationConfig, SimulationConfig as SimConfig } from './components/SimulationConfig';
 import { SimulationProgress } from './components/SimulationProgress';
+import { LeaderboardComponent } from './components/LeaderboardComponent'; // New component
 import { LLMService, LLMResponse } from './services/LLMService';
-import { TestRun, Demographics, SimulationResult } from './types';
+import { LeaderboardService } from './services/LeaderboardService'; // New service
+import { TestRun, Demographics, SimulationResult, LeaderboardEntry } from './types';
+import { estimateDemographicSize, calculateDemographicRevenue, calculateDemographicProfit } from './utils/DemographicSizing';
+import { DEFAULT_PRODUCT_SUGGESTIONS, getSuggestedPricing } from './utils/ProductSuggestions';
 
 type AppStep =
   | 'suggestion'           // Initial suggestion form
@@ -15,7 +22,8 @@ type AppStep =
   | 'manage-demographics'      // Review/edit demographics
   | 'configure-simulation'     // Set up simulation parameters
   | 'running-simulation'       // Running the simulations
-  | 'comparison';              // Viewing comparison results
+  | 'comparison'               // Viewing comparison results
+  | 'leaderboard';             // New: Viewing leaderboard
 
 function App() {
   // State for test runs
@@ -25,6 +33,11 @@ function App() {
   // State for current workflow
   const [initialProductDescription, setInitialProductDescription] = useState('Baseball caps based on video game characters. concentrate on anime and manga characters.');
   const [targetMarket, setTargetMarket] = useState('Video gamers');
+
+  // New: Pricing state with defaults
+  const [salesPrice, setSalesPrice] = useState<number>(49.99);
+  const [unitCost, setUnitCost] = useState<number>(15.00);
+
   const [demographics, setDemographics] = useState<Demographics[]>([]);
   const [simulationConfig, setSimulationConfig] = useState<SimConfig | null>(null);
   const [currentStep, setCurrentStep] = useState<AppStep>('suggestion');
@@ -36,32 +49,73 @@ function App() {
   const [totalSimulations, setTotalSimulations] = useState(0);
   const [recentResponses, setRecentResponses] = useState<LLMResponse[]>([]);
 
-  // Load saved runs from localStorage on app start
+  // New: Tycoon features
+  const [playerName, setPlayerName] = useState<string>('');
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+
+  const [isSavingToLeaderboard, setIsSavingToLeaderboard] = useState(false);
+
+  // Load saved runs and leaderboard on app start
   useEffect(() => {
     const savedLastRun = localStorage.getItem('adwords_last_run');
     if (savedLastRun) {
       try {
         const parsed = JSON.parse(savedLastRun);
-        // Convert timestamp back to Date object
+        // Convert timestamp back to Date object and add pricing if missing
         parsed.timestamp = new Date(parsed.timestamp);
+        if (!parsed.salesPrice) parsed.salesPrice = 49.99;
+        if (!parsed.unitCost) parsed.unitCost = 15.00;
+        if (!parsed.totalRevenue) parsed.totalRevenue = 0;
+        if (!parsed.totalProfit) parsed.totalProfit = 0;
         setLastRun(parsed);
       } catch (error) {
         console.error('Error loading saved run:', error);
       }
     }
+
+    // Load leaderboard
+    const loadLeaderboard = async () => {
+      const savedLeaderboard = await LeaderboardService.getLeaderboard();
+      setLeaderboard(savedLeaderboard);
+    };
+
+    loadLeaderboard();
+    // Set default pricing based on target market
+    const suggestedPricing = getSuggestedPricing(targetMarket);
+    setSalesPrice(suggestedPricing.salesPrice);
+    setUnitCost(suggestedPricing.unitCost);
   }, []);
 
-  // Handle suggestion acceptance
-  const handleAcceptSuggestion = (productDescription: string, tagline: string) => {
+  // Update pricing when target market changes
+  useEffect(() => {
+    const suggestedPricing = getSuggestedPricing(targetMarket);
+    setSalesPrice(suggestedPricing.salesPrice);
+    setUnitCost(suggestedPricing.unitCost);
+  }, [targetMarket]);
+
+  // Handle suggestion acceptance with pricing
+  const handleAcceptSuggestion = (
+    productDescription: string,
+    tagline: string,
+    newSalesPrice?: number,
+    newUnitCost?: number
+  ) => {
+    const finalSalesPrice = newSalesPrice ?? salesPrice;
+    const finalUnitCost = newUnitCost ?? unitCost;
+
     const newRun: TestRun = {
       id: `run-${Date.now()}`,
       productDescription,
       tagline,
       targetMarket,
+      salesPrice: finalSalesPrice,
+      unitCost: finalUnitCost,
       demographics: [],
       results: [],
       conversionRate: 0,
       engagementRate: 0,
+      totalRevenue: 0,
+      totalProfit: 0,
       timestamp: new Date()
     };
 
@@ -71,11 +125,17 @@ function App() {
 
   // Handle demographic generation completion
   const handleDemographicsGenerated = (generatedDemographics: Demographics[]) => {
-    setDemographics(generatedDemographics);
+    // Add estimated sizes to demographics
+    const demographicsWithSizes = generatedDemographics.map(demo => ({
+      ...demo,
+      estimatedSize: estimateDemographicSize(demo)
+    }));
+
+    setDemographics(demographicsWithSizes);
     if (currentRun) {
       setCurrentRun({
         ...currentRun,
-        demographics: generatedDemographics
+        demographics: demographicsWithSizes
       });
     }
     setCurrentStep('manage-demographics');
@@ -83,11 +143,17 @@ function App() {
 
   // Handle demographic management completion
   const handleDemographicsUpdated = (updatedDemographics: Demographics[]) => {
-    setDemographics(updatedDemographics);
+    // Ensure all demographics have estimated sizes
+    const demographicsWithSizes = updatedDemographics.map(demo => ({
+      ...demo,
+      estimatedSize: demo.estimatedSize || estimateDemographicSize(demo)
+    }));
+
+    setDemographics(demographicsWithSizes);
     if (currentRun) {
       setCurrentRun({
         ...currentRun,
-        demographics: updatedDemographics
+        demographics: demographicsWithSizes
       });
     }
   };
@@ -117,7 +183,7 @@ function App() {
     runSimulations(selectedDemographics, config.simulationsPerDemographic);
   };
 
-  // Run simulations for the current run
+  // Run simulations for the current run with revenue calculation
   const runSimulations = async (
     selectedDemographics: Demographics[],
     simulationsPerDemographic: number
@@ -140,7 +206,9 @@ function App() {
           followAndBuy: 0,
           followAndSave: 0
         },
-        totalSims: simulationsPerDemographic
+        totalSims: simulationsPerDemographic,
+        estimatedRevenue: 0,
+        estimatedProfit: 0
       };
 
       // Run batch of simulations for this demographic
@@ -167,6 +235,19 @@ function App() {
         result.responses[response.choice]++;
       });
 
+      // Calculate revenue and profit for this demographic
+      result.estimatedRevenue = calculateDemographicRevenue(
+        demographic,
+        result,
+        currentRun.salesPrice
+      );
+      result.estimatedProfit = calculateDemographicProfit(
+        demographic,
+        result,
+        currentRun.salesPrice,
+        currentRun.unitCost
+      );
+
       // Add to results
       simulationResults.push(result);
       setSimulationsCompleted(prev => prev + simulationsPerDemographic);
@@ -182,12 +263,18 @@ function App() {
     const conversionRate = totalResponses > 0 ? (totalConversions / totalResponses) * 100 : 0;
     const engagementRate = totalResponses > 0 ? (totalEngagement / totalResponses) * 100 : 0;
 
+    // Calculate total revenue and profit (TYCOON SCORE)
+    const totalRevenue = simulationResults.reduce((sum, result) => sum + (result.estimatedRevenue || 0), 0);
+    const totalProfit = simulationResults.reduce((sum, result) => sum + (result.estimatedProfit || 0), 0);
+
     // Update current run with results
     const updatedCurrentRun: TestRun = {
       ...currentRun,
       results: simulationResults,
       conversionRate,
       engagementRate,
+      totalRevenue,
+      totalProfit,
       timestamp: new Date()
     };
 
@@ -208,6 +295,8 @@ function App() {
 
     // Initialize new suggestion form with current run's data
     setInitialProductDescription(currentRun.productDescription);
+    setSalesPrice(currentRun.salesPrice);
+    setUnitCost(currentRun.unitCost);
     setCurrentRun(null);
     setCurrentStep('suggestion');
 
@@ -237,66 +326,106 @@ function App() {
     setRecentResponses([]);
   };
 
-  // Handle complete reset - clear everything including saved runs
-  const handleResetComparison = () => {
-    // Clear all state
-    setLastRun(null);
-    setCurrentRun(null);
-    setCurrentStep('suggestion');
-    setDemographics([]);
-    setSimulationConfig(null);
-    setSimulationsCompleted(0);
-    setTotalSimulations(0);
-    setCurrentDemographicId(null);
-    setCurrentVariantId(null);
-    setRecentResponses([]);
+  const handleSaveToLeaderboard = async () => {
+    if (!currentRun || !playerName.trim()) {
+      alert('Please enter your player name to save to the leaderboard!');
+      return;
+    }
 
-    // Clear localStorage
-    localStorage.removeItem('adwords_last_run');
+    try {
+      setIsSavingToLeaderboard(true);
 
-    // Reset to default values
-    setInitialProductDescription('Baseball caps based on video game characters. concentrate on anime and manga characters.');
-    setTargetMarket('Video gamers');
+      const updatedLeaderboard = await LeaderboardService.addEntry(currentRun, playerName);
+      setLeaderboard(updatedLeaderboard);
+      setCurrentStep('leaderboard');
+    } catch (error) {
+      console.error('Failed to save to leaderboard:', error);
+      alert('Failed to save to leaderboard. Please try again.');
+    } finally {
+      setIsSavingToLeaderboard(false);
+    }
+  };
+
+  // New: Handle viewing leaderboard
+  const handleViewLeaderboard = () => {
+    setCurrentStep('leaderboard');
+  };
+
+  // New: Handle updating pricing
+  const handleUpdatePricing = (newSalesPrice: number, newUnitCost: number) => {
+    setSalesPrice(newSalesPrice);
+    setUnitCost(newUnitCost);
+
+    // Update current run if it exists
+    if (currentRun) {
+      setCurrentRun({
+        ...currentRun,
+        salesPrice: newSalesPrice,
+        unitCost: newUnitCost
+      });
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <Navbar />
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+      {/* Updated Navbar with Tycoon branding */}
+      <nav className="bg-gradient-to-r from-purple-800 to-blue-800 text-white shadow-lg">
+        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+          <div className="flex items-center">
+            <span className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+              💰 AdWords Tycoon
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            {playerName && (
+              <span className="text-yellow-300">Player: {playerName}</span>
+            )}
+            <button
+              onClick={handleViewLeaderboard}
+              className="hover:text-yellow-300 transition-colors flex items-center"
+            >
+              🏆 Leaderboard
+            </button>
+            <a href="#" className="hover:text-yellow-300 transition-colors">About</a>
+          </div>
+        </div>
+      </nav>
 
       <main className="container mx-auto px-4 py-8">
         {/* Page Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-center mb-2 text-gradient">
-            Iterative AdWords Testing
+          <h1 className="text-4xl font-bold text-center mb-2 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+            Build Your Marketing Empire
           </h1>
 
           {/* Progress Steps - only show during active run */}
-          {currentStep !== 'suggestion' && currentStep !== 'comparison' && (
+          {currentStep !== 'suggestion' && currentStep !== 'comparison' && currentStep !== 'leaderboard' && (
             <div className="flex justify-center items-center space-x-2 mb-6">
               <div className={`h-2 w-2 rounded-full
                 ${['generating-demographics', 'manage-demographics', 'configure-simulation', 'running-simulation'].includes(currentStep)
-                  ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                  ? 'bg-yellow-400' : 'bg-gray-300'}`}>
               </div>
               <div className="h-px w-8 bg-gray-300"></div>
               <div className={`h-2 w-2 rounded-full
                 ${['manage-demographics', 'configure-simulation', 'running-simulation'].includes(currentStep)
-                  ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                  ? 'bg-yellow-400' : 'bg-gray-300'}`}>
               </div>
               <div className="h-px w-8 bg-gray-300"></div>
               <div className={`h-2 w-2 rounded-full
                 ${['configure-simulation', 'running-simulation'].includes(currentStep)
-                  ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                  ? 'bg-yellow-400' : 'bg-gray-300'}`}>
               </div>
               <div className="h-px w-8 bg-gray-300"></div>
               <div className={`h-2 w-2 rounded-full
-                ${currentStep === 'running-simulation' ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                ${currentStep === 'running-simulation' ? 'bg-yellow-400' : 'bg-gray-300'}`}>
               </div>
             </div>
           )}
 
           {/* Step label */}
-          {currentStep !== 'suggestion' && currentStep !== 'comparison' && (
-            <div className="text-center text-sm text-gray-600">
+          {currentStep !== 'suggestion' && currentStep !== 'comparison' && currentStep !== 'leaderboard' && (
+            <div className="text-center text-sm text-gray-300">
               {currentStep === 'generating-demographics' && 'Generating Demographics'}
               {currentStep === 'manage-demographics' && 'Manage Demographics'}
               {currentStep === 'configure-simulation' && 'Configure Testing'}
@@ -311,12 +440,18 @@ function App() {
             <SuggestionForm
               initialProductDescription={initialProductDescription}
               targetMarket={targetMarket}
+              salesPrice={salesPrice}
+              unitCost={unitCost}
+              playerName={playerName}
               lastRun={lastRun}
               onAcceptSuggestion={handleAcceptSuggestion}
               onUpdateInitialData={(productDesc, market) => {
                 setInitialProductDescription(productDesc);
                 setTargetMarket(market);
               }}
+              onUpdatePricing={handleUpdatePricing}
+              onUpdatePlayerName={setPlayerName}
+              productSuggestions={DEFAULT_PRODUCT_SUGGESTIONS}
             />
           )}
 
@@ -342,7 +477,9 @@ function App() {
               productVariants={[{
                 id: 'current-variant',
                 productDescription: currentRun.productDescription,
-                tagline: currentRun.tagline
+                tagline: currentRun.tagline,
+                salesPrice: currentRun.salesPrice,
+                unitCost: currentRun.unitCost
               }]}
               onStartSimulation={handleStartSimulation}
               onBack={() => setCurrentStep('manage-demographics')}
@@ -355,7 +492,9 @@ function App() {
               productVariants={[{
                 id: 'current-variant',
                 productDescription: currentRun.productDescription,
-                tagline: currentRun.tagline
+                tagline: currentRun.tagline,
+                salesPrice: currentRun.salesPrice,
+                unitCost: currentRun.unitCost
               }]}
               results={currentRun.results}
               currentDemographicId={currentDemographicId}
@@ -370,33 +509,54 @@ function App() {
             <RunComparison
               currentRun={currentRun}
               lastRun={lastRun}
+              playerName={playerName}
               onContinueWithCurrentRun={handleContinueWithCurrentRun}
               onStartFresh={handleStartFresh}
-              onResetComparison={handleResetComparison}
+              onSaveToLeaderboard={handleSaveToLeaderboard}
+              onViewLeaderboard={handleViewLeaderboard}
+              isSavingToLeaderboard={isSavingToLeaderboard}
+            />
+          )}
+
+          {currentStep === 'leaderboard' && (
+            <LeaderboardComponent
+              leaderboard={leaderboard}
+              currentRun={currentRun}
+              onStartNewCampaign={handleStartFresh}
+              onBackToResults={() => currentRun ? setCurrentStep('comparison') : setCurrentStep('suggestion')}
             />
           )}
         </div>
 
-        {/* Current Run Summary */}
-        {currentRun && currentStep !== 'suggestion' && currentStep !== 'comparison' && (
+        {/* Current Run Summary with Revenue */}
+        {currentRun && currentStep !== 'suggestion' && currentStep !== 'comparison' && currentStep !== 'leaderboard' && (
           <div className="max-w-4xl mx-auto mt-8">
-            <div className="bg-white bg-opacity-70 rounded-lg p-4 shadow-sm">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Current Test Run</h3>
+            <div className="bg-white/10 backdrop-blur-md rounded-lg p-4 shadow-sm text-white">
+              <h3 className="text-sm font-medium text-yellow-300 mb-2">Current Campaign</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-gray-500">Product:</span>
+                  <span className="text-gray-300">Product:</span>
                   <span className="ml-1">{currentRun.productDescription}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500">Tagline:</span>
+                  <span className="text-gray-300">Tagline:</span>
                   <span className="ml-1">"{currentRun.tagline}"</span>
                 </div>
                 <div>
-                  <span className="text-gray-500">Target Market:</span>
+                  <span className="text-gray-300">Price:</span>
+                  <span className="ml-1">${currentRun.salesPrice}</span>
+                  <span className="text-gray-400"> (Cost: ${currentRun.unitCost})</span>
+                </div>
+                <div>
+                  <span className="text-gray-300">Profit per Sale:</span>
+                  <span className="ml-1 text-green-400">${(currentRun.salesPrice - currentRun.unitCost).toFixed(2)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-300">Target Market:</span>
                   <span className="ml-1">{targetMarket}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500">Run ID:</span>
+                  <span className="text-gray-300">Campaign ID:</span>
                   <span className="ml-1">{currentRun.id}</span>
                 </div>
               </div>
