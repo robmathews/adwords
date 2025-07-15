@@ -8,13 +8,14 @@ import { LeaderboardService } from '../services/LeaderboardService';
 
 interface SuggestionFormProps {
   initialProductDescription: string;
+  tagline: string;
   targetMarket: string;
   salesPrice: number;
   unitCost: number;
   playerName: string;
   lastRun: TestRun | null;
-  onAcceptSuggestion: (productDescription: string, tagline: string, salesPrice?: number, unitCost?: number) => void;
-  onUpdateInitialData: (productDescription: string, targetMarket: string) => void;
+  onAcceptSuggestion: (productDescription: string, market: string,  tagline: string, salesPrice?: number, unitCost?: number) => void;
+  onUpdateInitialData: (productDescription: string, tagline: string, targetMarket: string) => void;
   onUpdatePricing: (salesPrice: number, unitCost: number) => void;
   onUpdatePlayerName: (playerName: string) => void;
   productSuggestions: ProductSuggestion[];
@@ -29,6 +30,7 @@ interface Suggestion {
 
 export const SuggestionForm: React.FC<SuggestionFormProps> = ({
   initialProductDescription,
+  initialTagline,
   targetMarket,
   salesPrice,
   unitCost,
@@ -41,6 +43,7 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
   productSuggestions
 }) => {
   const [productDescription, setProductDescription] = useState(initialProductDescription);
+  const [tagline, setTagline] = useState(initialTagline);
   const [market, setMarket] = useState(targetMarket);
   const [currentSalesPrice, setCurrentSalesPrice] = useState(salesPrice);
   const [currentUnitCost, setCurrentUnitCost] = useState(unitCost);
@@ -51,6 +54,7 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
   const [showQuickStart, setShowQuickStart] = useState(false);
   const [errors, setErrors] = useState({
     productDescription: '',
+    tagline: '',
     targetMarket: '',
     salesPrice: '',
     unitCost: '',
@@ -75,7 +79,7 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
     if (!validateForm()) return;
 
     // Update parent component with current data
-    onUpdateInitialData(productDescription, market);
+    onUpdateInitialData(productDescription, tagline, market);
     onUpdatePricing(currentSalesPrice, currentUnitCost);
 
     setIsGenerating(true);
@@ -147,6 +151,7 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
     if (finalSuggestion) {
       onAcceptSuggestion(
         finalSuggestion.productDescription,
+        finalSuggestion.market,
         finalSuggestion.tagline,
         finalSuggestion.salesPrice,
         finalSuggestion.unitCost
@@ -156,7 +161,7 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
 
   const handleUseAsIs = () => {
     if (!validateForm()) return;
-    onAcceptSuggestion(productDescription, 'Experience the difference', currentSalesPrice, currentUnitCost);
+    onAcceptSuggestion(productDescription, market, tagline, currentSalesPrice, currentUnitCost);
   };
 
   const formatDate = (date: Date) => {
@@ -306,6 +311,22 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
               placeholder="e.g., Premium gaming mouse pads with RGB lighting"
               value={productDescription}
               onChange={(e) => setProductDescription(e.target.value)}
+            />
+            {errors.productDescription && (
+              <p className="mt-1 text-sm text-red-400">{errors.productDescription}</p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="tagline" className="block text-sm font-medium text-gray-300 mb-1">
+              Tagline
+            </label>
+            <textarea
+              id="tagline"
+              className={`w-full px-4 py-3 rounded-lg bg-white/20 border text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 ${errors.productDescription ? 'border-red-500' : 'border-white/30'}`}
+              rows={3}
+              placeholder="e.g., Experience the difference"
+              value={tagline}
+              onChange={(e) => setTagline(e.target.value)}
             />
             {errors.productDescription && (
               <p className="mt-1 text-sm text-red-400">{errors.productDescription}</p>

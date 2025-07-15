@@ -32,6 +32,7 @@ function App() {
 
   // State for current workflow
   const [initialProductDescription, setInitialProductDescription] = useState('Baseball caps based on video game characters. concentrate on anime and manga characters.');
+  const [initialTagline, setInitialTagline] = useState('Live the life');
   const [targetMarket, setTargetMarket] = useState('Video gamers');
 
   // New: Pricing state with defaults
@@ -96,10 +97,14 @@ function App() {
   // Handle suggestion acceptance with pricing
   const handleAcceptSuggestion = (
     productDescription: string,
+    market: string,
     tagline: string,
     newSalesPrice?: number,
     newUnitCost?: number
   ) => {
+    setInitialProductDescription(productDescription);
+    setInitialTagline(tagline);
+    setTargetMarket(market);
     const finalSalesPrice = newSalesPrice ?? salesPrice;
     const finalUnitCost = newUnitCost ?? unitCost;
 
@@ -439,14 +444,16 @@ function App() {
           {currentStep === 'suggestion' && (
             <SuggestionForm
               initialProductDescription={initialProductDescription}
+              initialTagline={initialTagline}
               targetMarket={targetMarket}
               salesPrice={salesPrice}
               unitCost={unitCost}
               playerName={playerName}
               lastRun={lastRun}
               onAcceptSuggestion={handleAcceptSuggestion}
-              onUpdateInitialData={(productDesc, market) => {
+              onUpdateInitialData={(productDesc, tagline, market) => {
                 setInitialProductDescription(productDesc);
+                setTagline(tagline);
                 setTargetMarket(market);
               }}
               onUpdatePricing={handleUpdatePricing}
