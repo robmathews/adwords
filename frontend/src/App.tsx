@@ -1,5 +1,5 @@
 // frontend/src/App.tsx
-// Updated App component with AdWords Tycoon gamification features
+// Updated App component with AdWords Tycoon gamification features and marketing strategy
 
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
@@ -9,22 +9,25 @@ import { DemographicGeneration } from './components/DemographicGeneration';
 import { DemographicManager } from './components/DemographicManager';
 import { SimulationConfig, SimulationConfig as SimConfig } from './components/SimulationConfig';
 import { SimulationProgress } from './components/SimulationProgress';
-import { LeaderboardComponent } from './components/LeaderboardComponent'; // New component
+import { LeaderboardComponent } from './components/LeaderboardComponent';
+import { MarketingStrategySelector } from './components/MarketingStrategySelector';
 import { LLMService, LLMResponse } from './services/LLMService';
-import { LeaderboardService } from './services/LeaderboardService'; // New service
-import { TestRun, Demographics, SimulationResult, LeaderboardEntry } from './types';
+import { LeaderboardService } from './services/LeaderboardService';
+import { TestRun, Demographics, SimulationResult, LeaderboardEntry, MarketingStrategy } from './types';
 import { estimateDemographicSize, calculateDemographicRevenue, calculateDemographicProfit } from './utils/DemographicSizing';
+import { calculateDemographicRevenueWithMarketing } from './utils/MarketingChannels';
 import { DEFAULT_PRODUCT_SUGGESTIONS, getSuggestedPricing } from './utils/ProductSuggestions';
 import { formatMarketSize, calculateTotalMarketSize } from './utils/DemographicSizing';
 
 type AppStep =
-  | 'suggestion'           // Initial suggestion form
-  | 'generating-demographics'  // Auto-generating demographics
-  | 'manage-demographics'      // Review/edit demographics
-  | 'configure-simulation'     // Set up simulation parameters
-  | 'running-simulation'       // Running the simulations
-  | 'comparison'               // Viewing comparison results
-  | 'leaderboard';             // New: Viewing leaderboard
+  | 'suggestion'
+  | 'generating-demographics'
+  | 'manage-demographics'
+  | 'marketing-strategy'
+  | 'configure-simulation'
+  | 'running-simulation'
+  | 'comparison'
+  | 'leaderboard';
 
 function App() {
   // State for test runs
@@ -36,12 +39,13 @@ function App() {
   const [initialTagline, setInitialTagline] = useState('Live the life');
   const [targetMarket, setTargetMarket] = useState('Video gamers');
 
-  // New: Pricing state with defaults
+  // Pricing state with defaults
   const [salesPrice, setSalesPrice] = useState<number>(49.99);
   const [unitCost, setUnitCost] = useState<number>(15.00);
 
   const [demographics, setDemographics] = useState<Demographics[]>([]);
   const [simulationConfig, setSimulationConfig] = useState<SimConfig | null>(null);
+  const [marketingStrategy, setMarketingStrategy] = useState<MarketingStrategy | null>(null);
   const [currentStep, setCurrentStep] = useState<AppStep>('suggestion');
 
   // Simulation state
@@ -51,10 +55,9 @@ function App() {
   const [totalSimulations, setTotalSimulations] = useState(0);
   const [recentResponses, setRecentResponses] = useState<LLMResponse[]>([]);
 
-  // New: Tycoon features
+  // Tycoon features
   const [playerName, setPlayerName] = useState<string>('');
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-
   const [isSavingToLeaderboard, setIsSavingToLeaderboard] = useState(false);
 
   // Load saved runs and leaderboard on app start
@@ -63,7 +66,6 @@ function App() {
     if (savedLastRun) {
       try {
         const parsed = JSON.parse(savedLastRun);
-        // Convert timestamp back to Date object and add pricing if missing
         parsed.timestamp = new Date(parsed.timestamp);
         if (!parsed.salesPrice) parsed.salesPrice = 49.99;
         if (!parsed.unitCost) parsed.unitCost = 15.00;
@@ -75,14 +77,12 @@ function App() {
       }
     }
 
-    // Load leaderboard
     const loadLeaderboard = async () => {
       const savedLeaderboard = await LeaderboardService.getLeaderboard();
       setLeaderboard(savedLeaderboard);
     };
 
     loadLeaderboard();
-    // Set default pricing based on target market
     const suggestedPricing = getSuggestedPricing(targetMarket);
     setSalesPrice(suggestedPricing.salesPrice);
     setUnitCost(suggestedPricing.unitCost);
@@ -122,7 +122,16 @@ function App() {
       engagementRate: 0,
       totalRevenue: 0,
       totalProfit: 0,
-      timestamp: new Date()
+      timestamp: new Date(),
+      marketingStrategy: {
+        totalBudget: 5000,
+        channelAllocations: [],
+        duration: 30
+      },
+      marketingCost: 0,
+      netProfit: 0,
+      costPerAcquisition: 0,
+      returnOnAdSpend: 0
     };
 
     setCurrentRun(newRun);
@@ -131,7 +140,6 @@ function App() {
 
   // Handle demographic generation completion
   const handleDemographicsGenerated = (generatedDemographics: Demographics[]) => {
-    // Add estimated sizes to demographics
     const demographicsWithSizes = generatedDemographics.map(demo => ({
       ...demo,
       estimatedSize: estimateDemographicSize(demo)
@@ -149,7 +157,6 @@ function App() {
 
   // Handle demographic management completion
   const handleDemographicsUpdated = (updatedDemographics: Demographics[]) => {
-    // Ensure all demographics have estimated sizes
     const demographicsWithSizes = updatedDemographics.map(demo => ({
       ...demo,
       estimatedSize: demo.estimatedSize || estimateDemographicSize(demo)
@@ -164,8 +171,14 @@ function App() {
     }
   };
 
-  // Handle starting simulation configuration
+  // Handle starting marketing strategy configuration
   const handleConfigureSimulation = () => {
+    setCurrentStep('marketing-strategy');
+  };
+
+  // Handle marketing strategy selection
+  const handleMarketingStrategySelected = (strategy: MarketingStrategy) => {
+    setMarketingStrategy(strategy);
     setCurrentStep('configure-simulation');
   };
 
@@ -186,17 +199,24 @@ function App() {
     setRecentResponses([]);
 
     // Start the simulation process
-    runSimulations(selectedDemographics, config.simulationsPerDemographic);
+    if (marketingStrategy) {
+      runSimulations(selectedDemographics, config.simulationsPerDemographic, marketingStrategy);
+    }
   };
 
-  // Run simulations for the current run with revenue calculation
+  // Run simulations for the current run with marketing strategy
   const runSimulations = async (
     selectedDemographics: Demographics[],
-    simulationsPerDemographic: number
+    simulationsPerDemographic: number,
+    strategy: MarketingStrategy
   ) => {
     if (!currentRun) return;
 
     const simulationResults: SimulationResult[] = [];
+    let totalMarketingCost = 0;
+    let totalNetProfit = 0;
+    let totalCustomersAcquired = 0;
+    let totalRevenue = 0;
 
     // For each demographic (single variant testing)
     for (const demographic of selectedDemographics) {
@@ -241,18 +261,23 @@ function App() {
         result.responses[response.choice]++;
       });
 
-      // Calculate revenue and profit for this demographic
-      result.estimatedRevenue = calculateDemographicRevenue(
-        demographic,
-        result,
-        currentRun.salesPrice
-      );
-      result.estimatedProfit = calculateDemographicProfit(
+      // Calculate revenue and profit with marketing strategy
+      const marketingResults = calculateDemographicRevenueWithMarketing(
         demographic,
         result,
         currentRun.salesPrice,
-        currentRun.unitCost
+        currentRun.unitCost,
+        strategy
       );
+
+      result.estimatedRevenue = marketingResults.revenue;
+      result.estimatedProfit = marketingResults.netProfit;
+
+      // Accumulate totals
+      totalRevenue += marketingResults.revenue;
+      totalMarketingCost += marketingResults.marketingCost;
+      totalNetProfit += marketingResults.netProfit;
+      totalCustomersAcquired += marketingResults.revenue / currentRun.salesPrice;
 
       // Add to results
       simulationResults.push(result);
@@ -269,18 +294,23 @@ function App() {
     const conversionRate = totalResponses > 0 ? (totalConversions / totalResponses) * 100 : 0;
     const engagementRate = totalResponses > 0 ? (totalEngagement / totalResponses) * 100 : 0;
 
-    // Calculate total revenue and profit (TYCOON SCORE)
-    const totalRevenue = simulationResults.reduce((sum, result) => sum + (result.estimatedRevenue || 0), 0);
-    const totalProfit = simulationResults.reduce((sum, result) => sum + (result.estimatedProfit || 0), 0);
+    // Calculate marketing metrics
+    const costPerAcquisition = totalCustomersAcquired > 0 ? totalMarketingCost / totalCustomersAcquired : 0;
+    const returnOnAdSpend = totalMarketingCost > 0 ? totalRevenue / totalMarketingCost : 0;
 
-    // Update current run with results
+    // Update current run with results INCLUDING marketing strategy
     const updatedCurrentRun: TestRun = {
       ...currentRun,
       results: simulationResults,
       conversionRate,
       engagementRate,
       totalRevenue,
-      totalProfit,
+      totalProfit: totalNetProfit,
+      marketingStrategy: strategy,
+      marketingCost: totalMarketingCost,
+      netProfit: totalNetProfit,
+      costPerAcquisition,
+      returnOnAdSpend,
       timestamp: new Date()
     };
 
@@ -295,11 +325,9 @@ function App() {
   const handleContinueWithCurrentRun = () => {
     if (!currentRun) return;
 
-    // Save current run as last run
     setLastRun(currentRun);
     localStorage.setItem('adwords_last_run', JSON.stringify(currentRun));
 
-    // Initialize new suggestion form with current run's data
     setInitialProductDescription(currentRun.productDescription);
     setSalesPrice(currentRun.salesPrice);
     setUnitCost(currentRun.unitCost);
@@ -309,6 +337,7 @@ function App() {
     // Reset other state
     setDemographics([]);
     setSimulationConfig(null);
+    setMarketingStrategy(null);
     setSimulationsCompleted(0);
     setTotalSimulations(0);
     setCurrentDemographicId(null);
@@ -318,13 +347,13 @@ function App() {
 
   // Handle starting fresh
   const handleStartFresh = () => {
-    // Keep last run but start fresh
     setCurrentRun(null);
     setCurrentStep('suggestion');
 
     // Reset other state
     setDemographics([]);
     setSimulationConfig(null);
+    setMarketingStrategy(null);
     setSimulationsCompleted(0);
     setTotalSimulations(0);
     setCurrentDemographicId(null);
@@ -340,7 +369,6 @@ function App() {
 
     try {
       setIsSavingToLeaderboard(true);
-
       const updatedLeaderboard = await LeaderboardService.addEntry(currentRun, playerName);
       setLeaderboard(updatedLeaderboard);
       setCurrentStep('leaderboard');
@@ -352,17 +380,14 @@ function App() {
     }
   };
 
-  // New: Handle viewing leaderboard
   const handleViewLeaderboard = () => {
     setCurrentStep('leaderboard');
   };
 
-  // New: Handle updating pricing
   const handleUpdatePricing = (newSalesPrice: number, newUnitCost: number) => {
     setSalesPrice(newSalesPrice);
     setUnitCost(newUnitCost);
 
-    // Update current run if it exists
     if (currentRun) {
       setCurrentRun({
         ...currentRun,
@@ -374,7 +399,6 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-      {/* Updated Navbar with Tycoon branding */}
       <nav className="bg-gradient-to-r from-purple-800 to-blue-800 text-white shadow-lg">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center">
@@ -399,22 +423,25 @@ function App() {
       </nav>
 
       <main className="container mx-auto px-4 py-8">
-        {/* Page Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-center mb-2 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
             Build Your Marketing Empire
           </h1>
 
-          {/* Progress Steps - only show during active run */}
           {currentStep !== 'suggestion' && currentStep !== 'comparison' && currentStep !== 'leaderboard' && (
             <div className="flex justify-center items-center space-x-2 mb-6">
               <div className={`h-2 w-2 rounded-full
-                ${['generating-demographics', 'manage-demographics', 'configure-simulation', 'running-simulation'].includes(currentStep)
+                ${['generating-demographics', 'manage-demographics', 'marketing-strategy', 'configure-simulation', 'running-simulation'].includes(currentStep)
                   ? 'bg-yellow-400' : 'bg-gray-300'}`}>
               </div>
               <div className="h-px w-8 bg-gray-300"></div>
               <div className={`h-2 w-2 rounded-full
-                ${['manage-demographics', 'configure-simulation', 'running-simulation'].includes(currentStep)
+                ${['manage-demographics', 'marketing-strategy', 'configure-simulation', 'running-simulation'].includes(currentStep)
+                  ? 'bg-yellow-400' : 'bg-gray-300'}`}>
+              </div>
+              <div className="h-px w-8 bg-gray-300"></div>
+              <div className={`h-2 w-2 rounded-full
+                ${['marketing-strategy', 'configure-simulation', 'running-simulation'].includes(currentStep)
                   ? 'bg-yellow-400' : 'bg-gray-300'}`}>
               </div>
               <div className="h-px w-8 bg-gray-300"></div>
@@ -429,18 +456,17 @@ function App() {
             </div>
           )}
 
-          {/* Step label */}
           {currentStep !== 'suggestion' && currentStep !== 'comparison' && currentStep !== 'leaderboard' && (
             <div className="text-center text-sm text-gray-300">
               {currentStep === 'generating-demographics' && 'Generating Demographics'}
               {currentStep === 'manage-demographics' && 'Manage Demographics'}
+              {currentStep === 'marketing-strategy' && 'Choose Marketing Strategy'}
               {currentStep === 'configure-simulation' && 'Configure Testing'}
               {currentStep === 'running-simulation' && 'Running Test'}
             </div>
           )}
         </div>
 
-        {/* Step Content */}
         <div className="animate-fade-in">
           {currentStep === 'suggestion' && (
             <SuggestionForm
@@ -479,6 +505,18 @@ function App() {
             />
           )}
 
+          {currentStep === 'marketing-strategy' && currentRun && (
+            <MarketingStrategySelector
+              demographics={demographics}
+              estimatedRevenue={demographics.reduce((sum, demo) => {
+                const marketSize = demo.estimatedSize || 1000000;
+                return sum + (marketSize * 0.005 * 0.02 * currentRun.salesPrice);
+              }, 0)}
+              onStrategySelect={handleMarketingStrategySelected}
+              onBack={() => setCurrentStep('manage-demographics')}
+            />
+          )}
+
           {currentStep === 'configure-simulation' && currentRun && (
             <SimulationConfig
               demographics={demographics}
@@ -490,7 +528,7 @@ function App() {
                 unitCost: currentRun.unitCost
               }]}
               onStartSimulation={handleStartSimulation}
-              onBack={() => setCurrentStep('manage-demographics')}
+              onBack={() => setCurrentStep('marketing-strategy')}
             />
           )}
 
@@ -536,13 +574,11 @@ function App() {
           )}
         </div>
 
-        {/* Current Run Summary with Revenue and Market Size */}
         {currentRun && currentStep !== 'suggestion' && currentStep !== 'comparison' && currentStep !== 'leaderboard' && (
           <div className="max-w-4xl mx-auto mt-8">
             <div className="bg-white/10 backdrop-blur-md rounded-lg p-4 shadow-sm text-white">
               <h3 className="text-sm font-medium text-yellow-300 mb-2">Current Campaign</h3>
 
-              {/* Market Size Overview */}
               <div className="mb-4 p-3 bg-white/5 rounded-lg border border-white/20">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm text-blue-300">Total Addressable Market:</span>
@@ -555,7 +591,20 @@ function App() {
                 </div>
               </div>
 
-              {/* Existing campaign details */}
+              {marketingStrategy && (
+                <div className="mb-4 p-3 bg-white/5 rounded-lg border border-white/20">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-green-300">Marketing Budget:</span>
+                    <span className="font-semibold text-green-300">
+                      ${marketingStrategy.totalBudget.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {marketingStrategy.channelAllocations.length} channel(s) • ROI target: 200%+
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-gray-300">Product:</span>

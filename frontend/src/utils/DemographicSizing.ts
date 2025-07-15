@@ -1,7 +1,8 @@
 // frontend/src/utils/DemographicSizing.ts
 // Utility for estimating demographic market sizes
 
-import { Demographics, SimulationResult } from '../types';
+import { Demographics, SimulationResult, MarketingStrategy } from '../types';
+import { calculateTotalMarketPenetration, calculateChannelModifiers } from './MarketingChannels';
 
 // US demographic data (in thousands) - based on census estimates
 const US_DEMOGRAPHIC_SIZES = {
@@ -139,21 +140,57 @@ export function getMarketPenetrationRate(): number {
 export function calculateDemographicRevenue(
   demographic: Demographics,
   simulationResult: SimulationResult,
-  salesPrice: number
-): number {
+  salesPrice: number,
+  unitCost: number,
+  marketingStrategy: MarketingStrategy
+): {
+  revenue: number;
+  marketingCost: number;
+  profit: number;
+  netProfit: number;
+  reach: number;
+  costPerAcquisition: number;
+  returnOnAdSpend: number;
+} {
   const marketSize = demographic.estimatedSize || estimateDemographicSize(demographic);
-  const conversionRate = simulationResult.responses.followAndBuy / simulationResult.totalSims;
-  
-  // Scale factor to convert from simulation to real market
-  // This represents what percentage of the total market we're actually reaching
-  const marketPenetrationFactor = 0.005; // 0.5% market penetration
-  
-  const estimatedPurchases = Math.floor(marketSize * conversionRate * marketPenetrationFactor);
-  const revenue = estimatedPurchases * salesPrice;
-  
-  return Math.max(0, revenue);
-}
+  const baseConversionRate = simulationResult.responses.followAndBuy / simulationResult.totalSims;
 
+  // Calculate effective reach and modifiers from marketing strategy
+  const marketPenetration = calculateTotalMarketPenetration(marketingStrategy, demographic);
+  const modifiers = calculateChannelModifiers(marketingStrategy, demographic);
+
+  // Apply channel modifiers to conversion rate
+  const effectiveConversionRate = baseConversionRate * modifiers.conversionBoost;
+
+  // Calculate reach and sales
+  const peopleReached = Math.floor(marketSize * marketPenetration);
+  const estimatedPurchases = Math.floor(peopleReached * effectiveConversionRate);
+  const revenue = estimatedPurchases * salesPrice;
+  const grossProfit = estimatedPurchases * (salesPrice - unitCost);
+
+  // Calculate marketing cost for this demographic (proportional allocation)
+  // Split total marketing budget across all targeted demographics
+  const targetedDemographics = new Set<string>();
+  marketingStrategy.channelAllocations.forEach(allocation => {
+    allocation.targetDemographics.forEach(id => targetedDemographics.add(id));
+  });
+
+  const demographicMarketingCost = marketingStrategy.totalBudget / targetedDemographics.size;
+
+  const netProfit = grossProfit - demographicMarketingCost;
+  const costPerAcquisition = estimatedPurchases > 0 ? demographicMarketingCost / estimatedPurchases : 0;
+  const returnOnAdSpend = demographicMarketingCost > 0 ? revenue / demographicMarketingCost : 0;
+
+  return {
+    revenue,
+    marketingCost: demographicMarketingCost,
+    profit: grossProfit,
+    netProfit,
+    reach: peopleReached,
+    costPerAcquisition,
+    returnOnAdSpend
+  };
+}
 /**
  * Calculate estimated profit for a demographic
  */

@@ -1,8 +1,11 @@
+// frontend/src/components/SimulationProgress.tsx
+// Updated to pass selectedDemographics to LiveMarketImpact
+
 import React from 'react';
 import { ProductVariant, Demographics, SimulationResult } from '../types';
 import { LLMResponse } from '../services/LLMService';
 import { formatMarketSize, estimateDemographicSize } from '../utils/DemographicSizing';
-import { LiveMarketImpact } from './/LiveMarketImpact'; // New component
+import { LiveMarketImpact } from './LiveMarketImpact';
 
 interface SimulationProgressProps {
   demographics: Demographics[];
@@ -13,6 +16,7 @@ interface SimulationProgressProps {
   simulationsCompleted: number;
   totalSimulations: number;
   recentResponses: LLMResponse[];
+  selectedDemographics?: string[]; // Add this prop to track selected demographics
 }
 
 export const SimulationProgress: React.FC<SimulationProgressProps> = ({
@@ -23,7 +27,8 @@ export const SimulationProgress: React.FC<SimulationProgressProps> = ({
   currentVariantId,
   simulationsCompleted,
   totalSimulations,
-  recentResponses
+  recentResponses,
+  selectedDemographics
 }) => {
   // Find current demographic and variant
   const currentDemographic = currentDemographicId
@@ -67,7 +72,13 @@ export const SimulationProgress: React.FC<SimulationProgressProps> = ({
   };
 
   const completedCombinations = getCompletedCombinations();
-  const totalCombinations = demographics.length * productVariants.length;
+
+  // Use selectedDemographics if provided, otherwise use all demographics
+  const testingDemographics = selectedDemographics
+    ? demographics.filter(d => selectedDemographics.includes(d.id))
+    : demographics;
+
+  const totalCombinations = testingDemographics.length * productVariants.length;
   const completedCombinationsCount = completedCombinations.size;
 
   return (
@@ -96,6 +107,9 @@ export const SimulationProgress: React.FC<SimulationProgressProps> = ({
           demographics={demographics}
           results={results}
           currentDemographicId={currentDemographicId}
+          selectedDemographics={selectedDemographics}
+          simulationsCompleted={simulationsCompleted}
+          totalSimulations={totalSimulations}
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -103,7 +117,7 @@ export const SimulationProgress: React.FC<SimulationProgressProps> = ({
             <h3 className="font-medium text-blue-800 mb-2">Testing Combinations</h3>
             <div className="text-sm text-blue-700">
               <p>Completed: {completedCombinationsCount} of {totalCombinations}</p>
-              <p>Demographics: {demographics.length}</p>
+              <p>Demographics: {testingDemographics.length}</p>
               <p>Variants: {productVariants.length}</p>
             </div>
           </div>
@@ -156,7 +170,7 @@ export const SimulationProgress: React.FC<SimulationProgressProps> = ({
         <div className="mb-6">
           <h3 className="font-medium text-gray-800 mb-2">Testing Matrix Progress:</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-            {demographics.map(demo =>
+            {testingDemographics.map(demo =>
               productVariants.map(variant => {
                 const isComplete = completedCombinations.has(`${demo.id}-${variant.id}`);
                 const isCurrent = demo.id === currentDemographicId && variant.id === currentVariantId;

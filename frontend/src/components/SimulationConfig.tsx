@@ -257,6 +257,16 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
           )}
         </div>
 
+        {/* Market Impact Preview - Moved outside the broken grid structure */}
+        {config.selectedDemographics.length > 0 && (
+          <MarketImpactPreview
+            demographics={demographics}
+            selectedDemographics={config.selectedDemographics}
+            simulationsPerDemographic={config.simulationsPerDemographic}
+            salesPrice={productVariants[0]?.salesPrice || 49.99}
+          />
+        )}
+
         <div className="bg-indigo-50 rounded-lg p-4 mb-6">
           <h3 className="font-medium text-indigo-800 mb-2">A/B Testing Summary</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
@@ -278,17 +288,6 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
               <span className="text-gray-600">Total Simulations:</span>
               <span className="ml-2 font-medium">{totalSimulations.toLocaleString()}</span>
             </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-            {/* Market Impact Preview */}
-            {config.selectedDemographics.length > 0 && (
-              <MarketImpactPreview
-                demographics={demographics}
-                selectedDemographics={config.selectedDemographics}
-                simulationsPerDemographic={config.simulationsPerDemographic}
-                salesPrice={productVariants[0]?.salesPrice || 49.99}
-              />
-            )}
           </div>
           <div className="mt-3 text-sm">
             <span className="text-gray-600">Testing Matrix:</span>

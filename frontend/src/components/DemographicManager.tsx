@@ -117,7 +117,7 @@ export const DemographicManager: React.FC<DemographicManagerProps> = ({
               disabled={demographics.length === 0}
               className={`btn-primary text-sm ${demographics.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              Continue to Simulation
+              Continue to Marketing Strategy
             </button>
           </div>
         </div>

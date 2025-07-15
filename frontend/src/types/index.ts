@@ -1,5 +1,6 @@
 // frontend/src/types/index.ts
 
+
 // Define our app's main data types
 export interface ProductVariant {
   id: string;
@@ -47,6 +48,11 @@ export type TestRun = {
   totalRevenue: number; // New: total revenue across all demographics (SCORE)
   totalProfit: number; // New: total profit across all demographics
   timestamp: Date;
+  marketingStrategy?: MarketingStrategy;
+  marketingCost?: number; // Total marketing spend
+  netProfit?: number; // Profit after marketing costs
+  costPerAcquisition?: number; // Marketing cost per customer acquired
+  returnOnAdSpend?: number; // Revenue / Marketing Cost
 };
 
 // New: Leaderboard system
@@ -70,3 +76,50 @@ export interface ProductSuggestion {
   unitCost: number;
   targetMarket: string;
 }
+
+// New: Product suggestion with pricing
+export interface ProductSuggestion {
+  productDescription: string;
+  tagline: string;
+  salesPrice: number;
+  unitCost: number;
+  targetMarket: string;
+}
+
+// Marketing Channel System Types
+export interface MarketingChannel {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+
+  // Cost structure
+  costType: 'cpc' | 'cpm' | 'flat' | 'percentage';
+  baseCost: number; // Cost per click, per 1000 impressions, flat fee, or percentage
+
+  // Reach characteristics
+  maxReach: number; // Maximum % of demographic this channel can reach
+  targetingPrecision: number; // 0-1, how well it can target specific demographics
+
+  // Performance modifiers
+  conversionBoost: number; // Multiplier for conversion rates
+  engagementBoost: number; // Multiplier for engagement rates
+
+  // Channel-specific attributes
+  demographics: string[]; // Which demographics this channel works best for
+  minimumSpend?: number; // Minimum spend required
+  scalingEfficiency: number; // How efficiently spend converts to reach (diminishing returns)
+}
+
+export interface MarketingBudgetAllocation {
+  channelId: string;
+  spend: number;
+  targetDemographics: string[]; // Which demographics to target with this channel
+}
+
+export interface MarketingStrategy {
+  totalBudget: number;
+  channelAllocations: MarketingBudgetAllocation[];
+  duration: number; // Campaign duration in days/weeks
+}
+
