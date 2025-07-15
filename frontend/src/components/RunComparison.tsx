@@ -5,6 +5,9 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { TestRun } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { LeaderboardService } from '../services/LeaderboardService';
+import { formatMarketSize, calculateTotalMarketSize } from '../utils/DemographicSizing';
+import { MarketAnalysis} from "./MarketAnalysis";
+
 import {
   calculateStatisticalSignificance,
   formatPValue,
@@ -206,13 +209,13 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-400">
-                  {(currentRun.conversionRate * 100).toFixed(1)}%
+                  {(currentRun.conversionRate ).toFixed(1)}%
                 </div>
                 <div className="text-sm text-gray-400">Conversion Rate</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-purple-400">
-                  {(currentRun.engagementRate * 100).toFixed(1)}%
+                  {(currentRun.engagementRate).toFixed(1)}%
                 </div>
                 <div className="text-sm text-gray-400">Engagement Rate</div>
               </div>
@@ -251,7 +254,7 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
               </div>
               <div className="text-center">
                 <div className={`text-2xl font-bold ${comparison.conversionImprovement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {comparison.conversionImprovement >= 0 ? '+' : ''}{(comparison.conversionImprovement * 100).toFixed(1)}%
+                  {comparison.conversionImprovement >= 0 ? '+' : ''}{comparison.conversionImprovement.toFixed(1)}%
                 </div>
                 <div className="text-sm text-gray-400">Conversion</div>
                 {comparison.relativeConversionImprovement !== 0 && (
@@ -262,7 +265,7 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
               </div>
               <div className="text-center">
                 <div className={`text-2xl font-bold ${comparison.engagementImprovement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {comparison.engagementImprovement >= 0 ? '+' : ''}{(comparison.engagementImprovement * 100).toFixed(1)}%
+                  {comparison.engagementImprovement >= 0 ? '+' : ''}{comparison.engagementImprovement.toFixed(1)}%
                 </div>
                 <div className="text-sm text-gray-400">Engagement</div>
                 {comparison.relativeEngagementImprovement !== 0 && (
@@ -324,7 +327,7 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
               </p>
               <p className="text-sm text-gray-600">Relative improvement</p>
               <p className="text-sm text-gray-600 mt-1">
-                {statisticalAnalysis.absoluteDifference > 0 ? '+' : ''}{(statisticalAnalysis.absoluteDifference * 100).toFixed(2)}% absolute
+                {statisticalAnalysis.absoluteDifference > 0 ? '+' : ''}{statisticalAnalysis.absoluteDifference.toFixed(2)}% absolute
               </p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg">
@@ -337,6 +340,8 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
           </div>
         </div>
       )}
+      {/* Market Size Analysis */}
+      <MarketAnalysis currentRun={currentRun} lastRun={lastRun} />
 
       {/* Performance Comparison Chart */}
       <div className="bg-white rounded-lg shadow-lg p-6">
@@ -351,7 +356,7 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
                 if (name === 'revenue' || name === 'profit') {
                   return [LeaderboardService.formatCurrency(value as number), name];
                 }
-                return [(value as number * 100).toFixed(1) + '%', name];
+                return [(value as number).toFixed(1) + '%', name];
               }} />
               <Legend />
               <Bar dataKey="revenue" name="Revenue" fill="#F59E0B" />

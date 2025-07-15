@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { ProductVariant, Demographics } from '../types';
+import { formatMarketSize, calculateTotalMarketSize, getMarketPenetrationRate } from '../utils/DemographicSizing';
+
 interface SimulationConfigProps {
   demographics: Demographics[];
   productVariants: ProductVariant[];
@@ -60,6 +62,51 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
       ...prev,
       selectedDemographics: select ? demographics.map(d => d.id) : []
     }));
+  };
+
+  const MarketImpactPreview: React.FC<{
+    demographics: Demographics[];
+    selectedDemographics: string[];
+    simulationsPerDemographic: number;
+    salesPrice: number;
+  }> = ({ demographics, selectedDemographics, simulationsPerDemographic, salesPrice }) => {
+    const selectedDemos = demographics.filter(d => selectedDemographics.includes(d.id));
+    const totalMarketSize = calculateTotalMarketSize(selectedDemos);
+    const penetrationRate = getMarketPenetrationRate();
+
+    // Estimate potential reach (very rough)
+    const estimatedReach = Math.floor(totalMarketSize * penetrationRate);
+
+    // Conservative revenue estimate (assuming 2% conversion of reach)
+    const conservativeConversion = 0.02;
+    const potentialRevenue = estimatedReach * conservativeConversion * salesPrice;
+
+    return (
+      <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 mb-6 border border-green-200">
+        <h3 className="font-medium text-green-900 mb-3">🎯 Market Impact Preview</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-600">{formatMarketSize(totalMarketSize)}</div>
+            <div className="text-sm text-green-700">Selected Market Size</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold text-blue-600">{formatMarketSize(estimatedReach)}</div>
+            <div className="text-sm text-green-700">Est. Addressable</div>
+            <div className="text-xs text-gray-600">({(penetrationRate * 100).toFixed(1)}% penetration)</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold text-purple-600">
+              ${potentialRevenue.toLocaleString()}
+            </div>
+            <div className="text-sm text-green-700">Revenue Potential</div>
+            <div className="text-xs text-gray-600">({(conservativeConversion * 100)}% conversion)</div>
+          </div>
+        </div>
+        <div className="mt-3 text-xs text-green-600">
+          💡 Actual results depend on campaign effectiveness and demographic targeting accuracy
+        </div>
+      </div>
+    );
   };
 
   // Calculate total simulations (demographics × variants × simulations per demographic)
@@ -231,6 +278,17 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
               <span className="text-gray-600">Total Simulations:</span>
               <span className="ml-2 font-medium">{totalSimulations.toLocaleString()}</span>
             </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+            {/* Market Impact Preview */}
+            {config.selectedDemographics.length > 0 && (
+              <MarketImpactPreview
+                demographics={demographics}
+                selectedDemographics={config.selectedDemographics}
+                simulationsPerDemographic={config.simulationsPerDemographic}
+                salesPrice={productVariants[0]?.salesPrice || 49.99}
+              />
+            )}
           </div>
           <div className="mt-3 text-sm">
             <span className="text-gray-600">Testing Matrix:</span>

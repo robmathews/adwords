@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { Demographics } from '../types';
 import { DemographicEditor } from './DemographicEditor';
 import { getMosaicCategoryByName } from '../utils/MosaicCategories';
+import { formatMarketSize, calculateTotalMarketSize, estimateDemographicSize } from '../utils/DemographicSizing';
 
 interface DemographicManagerProps {
   demographics: Demographics[];
   onUpdateDemographics: (demographics: Demographics[]) => void;
   onContinue: () => void;
 }
+
 
 export const DemographicManager: React.FC<DemographicManagerProps> = ({
   demographics,
@@ -58,7 +60,41 @@ export const DemographicManager: React.FC<DemographicManagerProps> = ({
     mosaicCategory: '',
     description: ''
   };
-  
+
+  const MarketSizeOverview: React.FC<{ demographics: Demographics[] }> = ({ demographics }) => {
+    const totalMarketSize = calculateTotalMarketSize(demographics);
+    const averageMarketSize = demographics.length > 0 ? totalMarketSize / demographics.length : 0;
+    const largestMarket = Math.max(...demographics.map(d => d.estimatedSize || estimateDemographicSize(d)));
+    const smallestMarket = Math.min(...demographics.map(d => d.estimatedSize || estimateDemographicSize(d)));
+
+    return (
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 mb-6 border border-blue-200">
+        <h3 className="font-medium text-blue-900 mb-3">📊 Total Addressable Market (TAM)</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-600">{formatMarketSize(totalMarketSize)}</div>
+            <div className="text-sm text-blue-700">Total Market</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold text-green-600">{formatMarketSize(averageMarketSize)}</div>
+            <div className="text-sm text-blue-700">Avg per Demo</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-bold text-purple-600">{formatMarketSize(largestMarket)}</div>
+            <div className="text-sm text-blue-700">Largest Segment</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-bold text-orange-600">{formatMarketSize(smallestMarket)}</div>
+            <div className="text-sm text-blue-700">Smallest Segment</div>
+          </div>
+        </div>
+        <div className="mt-3 text-xs text-blue-600">
+          💡 Larger markets = more potential customers, but may have lower conversion rates
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
@@ -115,10 +151,22 @@ export const DemographicManager: React.FC<DemographicManagerProps> = ({
             <div className="space-y-4">
               {demographics.map(demo => {
                 const mosaicCategory = getMosaicCategoryByName(demo.mosaicCategory);
+                const marketSize = demo.estimatedSize || estimateDemographicSize(demo);
                 
                 return (
                   <div key={demo.id} className="border rounded-lg overflow-hidden">
                     <div className="flex justify-between items-center bg-gray-50 px-4 py-3 border-b">
+                      <div className="flex items-center space-x-4">
+                        <h3 className="font-medium">{demo.age} {demo.gender}</h3>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-blue-600 font-semibold">
+                            👥 {formatMarketSize(marketSize)}
+                          </span>
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                            Market Size
+                          </span>
+                        </div>
+                      </div>
                       <h3 className="font-medium">{demo.age} {demo.gender}</h3>
                       <div className="flex space-x-2">
                         <button

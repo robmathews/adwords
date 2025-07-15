@@ -52,7 +52,7 @@ export function estimateDemographicSize(demographic: Demographics): number {
   const genderKey = demographic.gender.toLowerCase() as keyof typeof US_DEMOGRAPHIC_SIZES[typeof ageGroup];
   
   // Get base demographic size
-  const baseSize = US_DEMOGRAPHIC_SIZES[ageGroup]?.[genderKey] || 10000;
+  const baseSize = (US_DEMOGRAPHIC_SIZES[ageGroup]?.[genderKey] || 10000) * 1000;
   
   // Apply interest-based targeting adjustment
   // More interests = more niche = smaller addressable market
@@ -64,7 +64,7 @@ export function estimateDemographicSize(demographic: Demographics): number {
   // Calculate final estimated size
   const estimatedSize = Math.floor(baseSize * interestFactor * mosaicFactor);
   
-  return Math.max(1000, estimatedSize); // Minimum 1k people
+  return Math.max(1000000, estimatedSize); // Minimum 1k people
 }
 
 /**
@@ -112,6 +112,27 @@ function getMosaicSizeFactor(mosaicCategory: string): number {
   return categoryFactors[mosaicCategory] || 0.7; // Default moderate size
 }
 
+export function formatMarketSize(size: number): string {
+  if (size >= 1000000000) {
+    return `${(size / 1000000000).toFixed(1)}B people`;
+  } else if (size >= 1000000) {
+    return `${(size / 1000000).toFixed(1)}M people`;
+  } else if (size >= 1000) {
+    return `${Math.round(size / 1000)}K people`;
+  } else {
+    return `${Math.round(size)} people`;
+  }
+}
+
+export function calculateTotalMarketSize(demographics: Demographics[]): number {
+  return demographics.reduce((total, demo) => {
+    return total + (demo.estimatedSize || estimateDemographicSize(demo));
+  }, 0);
+}
+
+export function getMarketPenetrationRate(): number {
+  return 0.005; // 0.5% - this could be made configurable
+}
 /**
  * Calculate estimated revenue for a demographic based on simulation results
  */
@@ -125,7 +146,7 @@ export function calculateDemographicRevenue(
   
   // Scale factor to convert from simulation to real market
   // This represents what percentage of the total market we're actually reaching
-  const marketPenetrationFactor = 0.001; // 0.1% market penetration
+  const marketPenetrationFactor = 0.005; // 0.5% market penetration
   
   const estimatedPurchases = Math.floor(marketSize * conversionRate * marketPenetrationFactor);
   const revenue = estimatedPurchases * salesPrice;

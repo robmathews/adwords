@@ -15,6 +15,7 @@ import { LeaderboardService } from './services/LeaderboardService'; // New servi
 import { TestRun, Demographics, SimulationResult, LeaderboardEntry } from './types';
 import { estimateDemographicSize, calculateDemographicRevenue, calculateDemographicProfit } from './utils/DemographicSizing';
 import { DEFAULT_PRODUCT_SUGGESTIONS, getSuggestedPricing } from './utils/ProductSuggestions';
+import { formatMarketSize, calculateTotalMarketSize } from './utils/DemographicSizing';
 
 type AppStep =
   | 'suggestion'           // Initial suggestion form
@@ -535,11 +536,26 @@ function App() {
           )}
         </div>
 
-        {/* Current Run Summary with Revenue */}
+        {/* Current Run Summary with Revenue and Market Size */}
         {currentRun && currentStep !== 'suggestion' && currentStep !== 'comparison' && currentStep !== 'leaderboard' && (
           <div className="max-w-4xl mx-auto mt-8">
             <div className="bg-white/10 backdrop-blur-md rounded-lg p-4 shadow-sm text-white">
               <h3 className="text-sm font-medium text-yellow-300 mb-2">Current Campaign</h3>
+
+              {/* Market Size Overview */}
+              <div className="mb-4 p-3 bg-white/5 rounded-lg border border-white/20">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm text-blue-300">Total Addressable Market:</span>
+                  <span className="font-semibold text-blue-300">
+                    {formatMarketSize(calculateTotalMarketSize(currentRun.demographics))}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-400">
+                  Across {currentRun.demographics.length} demographic segment(s)
+                </div>
+              </div>
+
+              {/* Existing campaign details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-gray-300">Product:</span>

@@ -1,6 +1,8 @@
 import React from 'react';
 import { ProductVariant, Demographics, SimulationResult } from '../types';
 import { LLMResponse } from '../services/LLMService';
+import { formatMarketSize, estimateDemographicSize } from '../utils/DemographicSizing';
+import { LiveMarketImpact } from './/LiveMarketImpact'; // New component
 
 interface SimulationProgressProps {
   demographics: Demographics[];
@@ -89,6 +91,12 @@ export const SimulationProgress: React.FC<SimulationProgressProps> = ({
             <span>Estimated time remaining: {estimateRemainingTime()}</span>
           </div>
         </div>
+
+        <LiveMarketImpact
+          demographics={demographics}
+          results={results}
+          currentDemographicId={currentDemographicId}
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div className="bg-blue-50 rounded-lg p-4">
