@@ -24,6 +24,8 @@ import {
   PlayerFinances,
   BudgetLevel,
   BUDGET_LEVELS,
+  CampaignCosts,
+  MarketingStrategy,
   calculateCampaignCosts,
   calculateROI,
   canAffordCampaign,
@@ -51,7 +53,6 @@ function App() {
   const [lastRun, setLastRun] = useState<TestRun | null>(null);
   const [currentRun, setCurrentRun] = useState<TestRun | null>(null);
 
-  // NEW: Game state with budget system
   const [gameState, setGameState] = useState<GameState>({
     playerName: '',
     finances: {
@@ -66,7 +67,8 @@ function App() {
     currentRun: null,
     gameHistory: [],
     isBankrupt: false,
-    achievements: []
+    achievements: [],
+    hasSubmittedToLeaderboard: false
   });
 
   // State for current workflow
@@ -507,6 +509,10 @@ function App() {
       const updatedLeaderboard = await LeaderboardService.addEntry(currentRun, gameState.playerName);
       setLeaderboard(updatedLeaderboard);
       setCurrentStep('leaderboard');
+      setGameState(prev => ({
+        ...prev,
+        hasSubmittedToLeaderboard: true
+      }));
     } catch (error) {
       console.error('Failed to save to leaderboard:', error);
       alert('Failed to save to leaderboard. Please try again.');
@@ -631,8 +637,7 @@ function App() {
           {currentStep === 'budget-selection' && (
             <BudgetSelector
               onSelectBudget={handleBudgetSelection}
-              gameHistory={gameState.gameHistory}
-              totalBankruptcies={gameState.finances.bankruptcies}
+              gameState={gameState}
             />
           )}
 
@@ -677,7 +682,6 @@ function App() {
           {currentStep === 'manage-demographics' && (
             <DemographicManager
               demographics={demographics}
-              gameState={gameState}
               onUpdateDemographics={handleDemographicsUpdated}
               onContinue={handleConfigureSimulation}
             />
@@ -701,7 +705,7 @@ function App() {
                 salesPrice: currentRun.salesPrice,
                 unitCost: currentRun.unitCost
               }]}
-              gameState={gameState} // NEW: Pass for cost calculation
+              gameState={gameState}
               onStartSimulation={handleStartSimulation}
               onBack={() => setCurrentStep('manage-demographics')}
             />

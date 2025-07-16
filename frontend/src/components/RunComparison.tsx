@@ -1,12 +1,12 @@
 // frontend/src/components/RunComparison.tsx
-// Fixed RunComparison component - removed async function calls from render
+// Updated with single leaderboard submission system
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { TestRun } from '../types';
+import { TestRun, GameState } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { LeaderboardService } from '../services/LeaderboardService';
 import { formatMarketSize, calculateTotalMarketSize } from '../utils/DemographicSizing';
-import { MarketAnalysis} from "./MarketAnalysis";
+import { MarketAnalysis } from "./MarketAnalysis";
 
 import {
   calculateStatisticalSignificance,
@@ -19,6 +19,7 @@ interface RunComparisonProps {
   currentRun: TestRun | null;
   lastRun: TestRun | null;
   playerName: string;
+  gameState: GameState;
   onContinueWithCurrentRun: () => void;
   onStartFresh: () => void;
   onSaveToLeaderboard: () => void;
@@ -30,6 +31,7 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
   currentRun,
   lastRun,
   playerName,
+  gameState,
   onContinueWithCurrentRun,
   onStartFresh,
   onSaveToLeaderboard,
@@ -157,6 +159,26 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      {/* Game Over Warning */}
+      {gameState.hasSubmittedToLeaderboard && (
+        <div className="rounded-2xl p-8 border-2 backdrop-blur-md bg-gradient-to-r from-red-500/20 to-orange-500/20 border-red-400">
+          <div className="text-center">
+            <h2 className="text-4xl font-bold mb-2 text-white">
+              🏆 Game Over - Leaderboard Submitted!
+            </h2>
+            <p className="text-red-200 text-lg mb-4">
+              You have already submitted to the leaderboard. Your game has ended.
+            </p>
+            <button
+              onClick={onViewLeaderboard}
+              className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-black font-bold rounded-lg hover:from-yellow-400 hover:to-orange-400 transition-all"
+            >
+              View Leaderboard
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Tycoon Results Summary */}
       <div className={`rounded-2xl p-8 border-2 backdrop-blur-md ${
         comparison === 'first_run' ? 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-400' :
@@ -186,13 +208,44 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
           </div>
           <div className="text-xl text-gray-300 mb-4">Total Revenue (Tycoon Score)</div>
 
-          {qualifiesForLeaderboard && potentialRank && (
+          {qualifiesForLeaderboard && potentialRank && !gameState.hasSubmittedToLeaderboard && (
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/20 border border-yellow-400 rounded-full">
               <span className="text-yellow-400 font-bold">
-                🏆 Leaderboard Rank #{potentialRank}
+                🏆 Would Rank #{potentialRank} on Leaderboard
               </span>
             </div>
           )}
+        </div>
+
+        {/* Budget Status Display */}
+        <div className="mb-8 bg-white/10 rounded-lg p-4">
+          <h3 className="font-medium text-yellow-300 mb-3">💰 Financial Status</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-400">
+                ${gameState.finances.currentBudget.toLocaleString()}
+              </div>
+              <div className="text-sm text-gray-400">Current Budget</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-400">
+                {gameState.finances.campaignsRun}
+              </div>
+              <div className="text-sm text-gray-400">Campaigns Run</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-purple-400">
+                ${gameState.finances.totalRevenue.toLocaleString()}
+              </div>
+              <div className="text-sm text-gray-400">Total Revenue</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-400">
+                {gameState.hasSubmittedToLeaderboard ? '🏆 Submitted' : '💫 Available'}
+              </div>
+              <div className="text-sm text-gray-400">Leaderboard Status</div>
+            </div>
+          </div>
         </div>
 
         {comparison === 'first_run' ? (
@@ -282,7 +335,7 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
                   🎉 Excellent! Your revenue increased by {comparison.relativeRevenueImprovement.toFixed(1)}%
                 </p>
                 <p className="text-gray-400">
-                  Keep building on this success to climb the leaderboard!
+                  Keep building on this success or submit to the leaderboard!
                 </p>
               </div>
             ) : (
@@ -340,6 +393,7 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
           </div>
         </div>
       )}
+
       {/* Market Size Analysis */}
       <MarketAnalysis currentRun={currentRun} lastRun={lastRun} />
 
@@ -373,58 +427,83 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
         <h3 className="text-lg font-semibold mb-4">Next Steps</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Save to Leaderboard */}
-          {qualifiesForLeaderboard && (
+          {/* Save to Leaderboard - only if not already submitted */}
+          {qualifiesForLeaderboard && !gameState.hasSubmittedToLeaderboard && (
             <div className="bg-yellow-50 border border-yellow-200 rounded p-4">
               <h4 className="font-medium text-yellow-800 mb-2">
                 🏆 Leaderboard Qualification!
               </h4>
-              <p className="text-yellow-700 text-sm mb-3">
+              <p className="text-yellow-700 text-sm mb-2">
                 This campaign qualifies for the global leaderboard at rank #{potentialRank}!
+              </p>
+              <p className="text-red-600 text-xs mb-3">
+                ⚠️ WARNING: Submitting to leaderboard ENDS YOUR ENTIRE GAME permanently!
               </p>
               <button
                 onClick={onSaveToLeaderboard}
                 className="w-full btn-primary bg-yellow-600 hover:bg-yellow-700"
               >
-                {isSavingToLeaderboard ? 'Saving...' : 'Save to Leaderboard'}
+                {isSavingToLeaderboard ? 'Saving...' : 'Submit to Leaderboard & End Game'}
               </button>
             </div>
           )}
 
-          {/* Continue Testing */}
-          <div className="bg-blue-50 border border-blue-200 rounded p-4">
-            <h4 className="font-medium text-blue-800 mb-2">
-              {comparison === 'first_run' || comparison?.isCurrentBetter ? 'Continue Optimizing' : 'Keep Experimenting'}
-            </h4>
-            <p className="text-blue-700 text-sm mb-3">
-              {comparison === 'first_run'
-                ? 'Use this as your baseline and test new variations to improve performance.'
-                : comparison?.isCurrentBetter
-                ? 'Build on this success by testing more variations.'
-                : 'Try different approaches to beat your previous best.'
-              }
-            </p>
-            <button
-              onClick={onContinueWithCurrentRun}
-              className="w-full btn-primary"
-            >
-              Continue Testing
-            </button>
-          </div>
+          {/* Show when already submitted */}
+          {gameState.hasSubmittedToLeaderboard && (
+            <div className="bg-red-50 border border-red-200 rounded p-4">
+              <h4 className="font-medium text-red-800 mb-2">
+                🏆 Already Submitted to Leaderboard
+              </h4>
+              <p className="text-red-700 text-sm mb-3">
+                Your game has ended. You can view the leaderboard or start a completely new game.
+              </p>
+              <button
+                onClick={onViewLeaderboard}
+                className="w-full btn-primary bg-red-600 hover:bg-red-700"
+              >
+                View Leaderboard
+              </button>
+            </div>
+          )}
 
-          {/* Start Fresh */}
-          <div className="bg-gray-50 border border-gray-200 rounded p-4">
-            <h4 className="font-medium text-gray-800 mb-2">New Campaign</h4>
-            <p className="text-gray-700 text-sm mb-3">
-              Start over with a different product or target market.
-            </p>
-            <button
-              onClick={onStartFresh}
-              className="w-full btn-secondary"
-            >
-              Start New Campaign
-            </button>
-          </div>
+          {/* Continue Testing - only if not submitted */}
+          {!gameState.hasSubmittedToLeaderboard && (
+            <div className="bg-blue-50 border border-blue-200 rounded p-4">
+              <h4 className="font-medium text-blue-800 mb-2">
+                {comparison === 'first_run' || comparison?.isCurrentBetter ? 'Continue Building' : 'Keep Experimenting'}
+              </h4>
+              <p className="text-blue-700 text-sm mb-3">
+                {comparison === 'first_run'
+                  ? 'Run more campaigns to build up your budget and score before submitting to leaderboard.'
+                  : comparison?.isCurrentBetter
+                  ? 'Build on this success with more campaigns or submit this score to the leaderboard.'
+                  : 'Try different approaches to beat your previous best before considering leaderboard submission.'
+                }
+              </p>
+              <button
+                onClick={onContinueWithCurrentRun}
+                className="w-full btn-primary"
+              >
+                Continue Testing
+              </button>
+            </div>
+          )}
+
+          {/* Start Fresh - only if not submitted */}
+          {!gameState.hasSubmittedToLeaderboard && (
+            <div className="bg-gray-50 border border-gray-200 rounded p-4">
+              <h4 className="font-medium text-gray-800 mb-2">New Campaign</h4>
+              <p className="text-gray-700 text-sm mb-3">
+                Start over with a different product or target market.
+              </p>
+              <button
+                onClick={onStartFresh}
+                className="w-full btn-secondary"
+              >
+                Start New Campaign
+              </button>
+            </div>
+          )}
 
           {/* View Leaderboard */}
           <div className="bg-purple-50 border border-purple-200 rounded p-4">

@@ -1,8 +1,8 @@
 // frontend/src/components/SimulationProgress.tsx
-// Updated to pass selectedDemographics to LiveMarketImpact
+// Updated with single leaderboard submission system
 
 import React from 'react';
-import { ProductVariant, Demographics, SimulationResult } from '../types';
+import { ProductVariant, Demographics, SimulationResult, GameState } from '../types';
 import { LLMResponse } from '../services/LLMService';
 import { formatMarketSize, estimateDemographicSize } from '../utils/DemographicSizing';
 import { LiveMarketImpact } from './LiveMarketImpact';
@@ -16,7 +16,8 @@ interface SimulationProgressProps {
   simulationsCompleted: number;
   totalSimulations: number;
   recentResponses: LLMResponse[];
-  selectedDemographics?: string[]; // Add this prop to track selected demographics
+  gameState: GameState;
+  selectedDemographics?: string[];
 }
 
 export const SimulationProgress: React.FC<SimulationProgressProps> = ({
@@ -28,6 +29,7 @@ export const SimulationProgress: React.FC<SimulationProgressProps> = ({
   simulationsCompleted,
   totalSimulations,
   recentResponses,
+  gameState,
   selectedDemographics
 }) => {
   // Find current demographic and variant
@@ -85,6 +87,41 @@ export const SimulationProgress: React.FC<SimulationProgressProps> = ({
     <div className="max-w-5xl mx-auto">
       <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Campaign Testing Progress</h2>
+
+        {/* Game State Warning */}
+        {gameState.hasSubmittedToLeaderboard && (
+          <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3">
+            <div className="flex items-center">
+              <span className="text-red-600 mr-2">🏆</span>
+              <span className="text-red-800 font-medium">Game Over - You have already submitted to the leaderboard</span>
+            </div>
+          </div>
+        )}
+
+        {/* Budget Status Display */}
+        <div className="mb-6 bg-blue-50 rounded-lg p-4 border border-blue-200">
+          <h3 className="font-medium text-blue-900 mb-3">💰 Budget Status</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-xl font-bold text-blue-600">
+                ${gameState.finances.currentBudget.toLocaleString()}
+              </div>
+              <div className="text-sm text-blue-700">Current Budget</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-green-600">
+                {gameState.finances.campaignsRun}
+              </div>
+              <div className="text-sm text-blue-700">Campaigns Run</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-purple-600">
+                {gameState.hasSubmittedToLeaderboard ? '🏆 Submitted' : '💫 Available'}
+              </div>
+              <div className="text-sm text-blue-700">Leaderboard Status</div>
+            </div>
+          </div>
+        </div>
 
         <div className="mb-6">
           <div className="flex justify-between text-sm text-gray-600 mb-1">
@@ -235,6 +272,19 @@ export const SimulationProgress: React.FC<SimulationProgressProps> = ({
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Campaign Completion Warning */}
+        {progressPercentage > 90 && !gameState.hasSubmittedToLeaderboard && (
+          <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-center mb-2">
+              <span className="text-yellow-600 mr-2">⚠️</span>
+              <span className="text-yellow-800 font-medium">Campaign Almost Complete!</span>
+            </div>
+            <p className="text-yellow-700 text-sm">
+              Your campaign is almost finished. Once complete, you'll have one chance to submit to the leaderboard - choose wisely as this ends your entire game!
+            </p>
           </div>
         )}
       </div>

@@ -110,7 +110,7 @@ export type TestRun = {
   campaignCosts: CampaignCosts;
   netProfit: number; // Revenue - costs
   roi: number; // Return on investment percentage
-  marketingStrategy: MarketingStrategy;
+  marketingStrategy?: MarketingStrategy;
 };
 
 // NEW: Player financial state
@@ -132,6 +132,7 @@ export interface GameState {
   gameHistory: TestRun[];
   isBankrupt: boolean;
   achievements: string[];
+  hasSubmittedToLeaderboard: boolean;
 }
 
 export interface LeaderboardEntry {
@@ -144,7 +145,6 @@ export interface LeaderboardEntry {
   conversionRate: number;
   engagementRate: number;
   timestamp: Date;
-  // NEW: Financial metrics
   budgetLevel: BudgetLevel;
   netProfit: number;
   roi: number;

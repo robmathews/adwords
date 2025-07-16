@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { ProductVariant, Demographics } from '../types';
+import { ProductVariant, Demographics, GameState, calculateCampaignCosts, canAffordCampaign, formatCurrency } from '../types';
 import { formatMarketSize, calculateTotalMarketSize, getMarketPenetrationRate } from '../utils/DemographicSizing';
 
 interface SimulationConfigProps {
   demographics: Demographics[];
   productVariants: ProductVariant[];
+  gameState: GameState;
   onStartSimulation: (config: SimulationConfig) => void;
   onBack: () => void;
 }
@@ -17,6 +18,7 @@ export interface SimulationConfig {
 export const SimulationConfig: React.FC<SimulationConfigProps> = ({
   demographics,
   productVariants,
+  gameState,
   onStartSimulation,
   onBack
 }) => {
@@ -109,11 +111,21 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
     );
   };
 
+  // Calculate campaign costs and affordability
+  const selectedDemographics = demographics.filter(d => config.selectedDemographics.includes(d.id));
+  const campaignCosts = calculateCampaignCosts(
+    gameState.finances.budgetLevel,
+    selectedDemographics.length,
+    config.simulationsPerDemographic
+  );
+  const canAfford = canAffordCampaign(gameState.finances.currentBudget, campaignCosts);
+  const budgetAfterCampaign = gameState.finances.currentBudget - campaignCosts.total;
+
   // Calculate total simulations (demographics × variants × simulations per demographic)
   const totalSimulations = config.simulationsPerDemographic * config.selectedDemographics.length * productVariants.length;
 
   // Check if configuration is valid
-  const isConfigValid = config.selectedDemographics.length > 0 && config.simulationsPerDemographic > 0;
+  const isConfigValid = config.selectedDemographics.length > 0 && config.simulationsPerDemographic > 0 && canAfford;
 
   // Estimate simulation time (rough estimate)
   const estimatedTime = Math.ceil(totalSimulations * 0.1); // 0.1 seconds per simulation is a rough estimate
@@ -123,7 +135,50 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
       <div className="bg-white rounded-lg shadow-lg p-6">
         <h2 className="text-xl font-semibold mb-4">Configure Campaign Testing Simulation</h2>
 
-        {/* Campaign Campaign Variants Display */}
+        {/* Budget Status Warning */}
+        {!canAfford && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center mb-2">
+              <span className="text-2xl mr-2">🚨</span>
+              <h3 className="font-semibold text-red-800">Cannot Afford This Campaign</h3>
+            </div>
+            <p className="text-red-700 text-sm mb-3">
+              Campaign cost: {formatCurrency(campaignCosts.total)} | Your budget: {formatCurrency(gameState.finances.currentBudget)}
+            </p>
+            <p className="text-red-600 text-xs">
+              Reduce demographics or simulations per demographic to lower costs.
+            </p>
+          </div>
+        )}
+
+        {/* Campaign Budget Overview */}
+        <div className="mb-6 bg-blue-50 rounded-lg p-4 border border-blue-200">
+          <h3 className="font-medium text-blue-900 mb-3">💰 Campaign Budget Breakdown</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-xl font-bold text-blue-600">{formatCurrency(gameState.finances.currentBudget)}</div>
+              <div className="text-sm text-blue-700">Current Budget</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-red-600">{formatCurrency(campaignCosts.total)}</div>
+              <div className="text-sm text-blue-700">Campaign Cost</div>
+            </div>
+            <div className="text-center">
+              <div className={`text-xl font-bold ${budgetAfterCampaign >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency(budgetAfterCampaign)}
+              </div>
+              <div className="text-sm text-blue-700">Budget After</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-purple-600">
+                {gameState.hasSubmittedToLeaderboard ? '🏆 Game Over' : '💫 Can Submit'}
+              </div>
+              <div className="text-sm text-blue-700">Leaderboard Status</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Campaign Variants Display */}
         <div className="mb-6">
           <h3 className="text-lg font-medium text-gray-800 mb-3">Campaign Variants</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -168,7 +223,7 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
             />
           </div>
           <p className="text-sm text-gray-500 mt-1">
-            Each demographic will be tested against all {productVariants.length} variants. Higher numbers provide more accurate results but take longer.
+            Each demographic will be tested against all {productVariants.length} variants. Higher numbers provide more accurate results but cost more.
           </p>
         </div>
 
@@ -257,7 +312,7 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
           )}
         </div>
 
-        {/* Market Impact Preview - Moved outside the broken grid structure */}
+        {/* Market Impact Preview */}
         {config.selectedDemographics.length > 0 && (
           <MarketImpactPreview
             demographics={demographics}
@@ -290,9 +345,9 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
             </div>
           </div>
           <div className="mt-3 text-sm">
-            <span className="text-gray-600">Testing Matrix:</span>
-            <span className="ml-2 font-medium">
-              {config.selectedDemographics.length} demographics × {productVariants.length} variants × {config.simulationsPerDemographic} simulations each
+            <span className="text-gray-600">Campaign Cost:</span>
+            <span className={`ml-2 font-medium ${canAfford ? 'text-green-600' : 'text-red-600'}`}>
+              {formatCurrency(campaignCosts.total)}
             </span>
           </div>
           <div className="mt-2 text-sm">
@@ -312,7 +367,8 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
             <li>• Demographic-specific responses for each variant</li>
             <li>• Best performing variant identification</li>
             <li>• Engagement and conversion rates by demographic</li>
-            <li>• Performance comparison between campaign variants</li>
+            <li>• Total revenue and ROI calculations</li>
+            <li>• Budget impact and remaining funds after campaign</li>
           </ul>
         </div>
 
@@ -331,7 +387,7 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
             disabled={!isConfigValid}
             className={`btn-primary ${!isConfigValid ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            Start Campaign Testing
+            {canAfford ? 'Start Campaign Testing' : `Need ${formatCurrency(campaignCosts.total - gameState.finances.currentBudget)} More`}
           </button>
         </div>
       </div>
