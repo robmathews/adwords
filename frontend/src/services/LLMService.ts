@@ -16,6 +16,7 @@ export interface SimulationParams {
   demographic: Demographics;
   productDescription: string;
   tagline: string;
+  salesPrice: number;
 }
 
 export interface ProductSuggestionParams {
@@ -274,6 +275,7 @@ export class LLMService {
           demographic: params.demographic,
           productDescription: params.productDescription,
           tagline: params.tagline,
+          salesPrice: params.salesPrice,
           count
         }),
       });
@@ -333,6 +335,7 @@ export class LLMService {
             demographic: params.demographic,
             productDescription: params.productDescription,
             tagline: params.tagline,
+            salesPrice: params.salesPrice,
             count: currentBatchSize
           }),
         });

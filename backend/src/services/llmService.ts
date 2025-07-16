@@ -24,6 +24,7 @@ export interface SimulationParams {
   demographic: Demographics;
   productDescription: string;
   tagline: string;
+  salesPrice: number;
 }
 
 export interface ProductSuggestionParams {
@@ -506,6 +507,13 @@ export async function simulateResponse(params: SimulationParams): Promise<LLMRes
 
           Product: ${params.productDescription}
           Tagline: "${params.tagline}"
+          Price: $${params.salesPrice}
+
+
+          Consider the price point in relation to this demographic's typical spending power based on their socioeconomic profile (${params.demographic.mosaicCategory}) and age range.
+          Factor in whether this price seems reasonable, expensive, or cheap for someone in this demographic when making your decision.
+          A higher price might make some demographics more interested (premium appeal) or less interested (affordability concerns).
+          Lower prices might seem like great value or raise quality concerns.
 
           Based on your demographic persona, how would you most likely respond to this advertisement? Choose exactly one of these options:
           1. "ignore" - You would scroll past or ignore the advertisement

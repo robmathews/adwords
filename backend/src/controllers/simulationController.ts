@@ -6,13 +6,13 @@ import * as llmService from '../services/llmService';
  */
 export const simulateResponse = async (req: Request, res: Response) => {
   try {
-    const { demographic, productDescription, tagline } = req.body;
+    const { demographic, productDescription, tagline, salesPrice } = req.body;
     
     // Validate input
-    if (!demographic || !productDescription || !tagline) {
+    if (!demographic || !productDescription || !tagline || !salesPrice) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Missing required fields: demographic, productDescription, and/or tagline' 
+        message: 'Missing required fields: demographic, productDescription, salesPrice and/or tagline'
       });
     }
     
@@ -20,7 +20,8 @@ export const simulateResponse = async (req: Request, res: Response) => {
     const response = await llmService.simulateResponse({
       demographic,
       productDescription,
-      tagline
+      tagline,
+      salesPrice
     });
     
     // Return response
@@ -44,13 +45,13 @@ export const simulateResponse = async (req: Request, res: Response) => {
  */
 export const simulateBatch = async (req: Request, res: Response) => {
   try {
-    const { demographic, productDescription, tagline, count } = req.body;
+    const { demographic, productDescription, tagline, salesPrice, count } = req.body;
     
     // Validate input
-    if (!demographic || !productDescription || !tagline || !count) {
+    if (!demographic || !productDescription || !tagline || !salesPrice ||!count) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Missing required fields: demographic, productDescription, tagline, and/or count' 
+        message: 'Missing required fields: demographic, productDescription, tagline, salesPrice, and/or count'
       });
     }
     
@@ -66,7 +67,8 @@ export const simulateBatch = async (req: Request, res: Response) => {
     const responses = await llmService.runBatchSimulations({
       demographic,
       productDescription,
-      tagline
+      tagline,
+      salesPrice
     }, count);
     
     // Return responses

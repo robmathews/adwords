@@ -19,6 +19,7 @@ interface SuggestionFormProps {
   onUpdateInitialData: (productDescription: string, tagline: string, targetMarket: string) => void;
   onUpdatePricing: (salesPrice: number, unitCost: number) => void;
   onUpdatePlayerName: (playerName: string) => void;
+  onCompleteReset: () => void; // Add this prop for reset functionality
   productSuggestions: ProductSuggestion[];
 }
 
@@ -43,6 +44,7 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
   onUpdateInitialData,
   onUpdatePricing,
   onUpdatePlayerName,
+  onCompleteReset,
   productSuggestions
 }) => {
   const [productDescription, setProductDescription] = useState(initialProductDescription);
@@ -65,7 +67,7 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
   });
 
   // NEW: Calculate estimated campaign costs
-  const estimatedCosts = calculateCampaignCosts(gameState.finances.budgetLevel, 3, 10); // Estimate 3 demographics, 10 sims each
+  const estimatedCosts = calculateCampaignCosts(gameState.finances.budgetLevel, 3); // Estimate 3 demographics
   const canAffordEstimate = gameState.finances.currentBudget >= estimatedCosts.total;
   const budgetAfterCampaign = gameState.finances.currentBudget - estimatedCosts.total;
 
@@ -190,6 +192,12 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
     onAcceptSuggestion(productDescription, market, tagline, currentSalesPrice, currentUnitCost);
   };
 
+  const handleBudgetCrisisReset = () => {
+    if (window.confirm('**Budget Crisis!** Are you sure you want to start over completely? This will reset all your progress and return you to budget selection.')) {
+      onCompleteReset();
+    }
+  };
+
   const formatDate = (date: Date) => {
     return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
@@ -214,6 +222,14 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
           </p>
           <div className="text-sm text-red-300">
             💡 Tip: Campaigns with fewer demographics and simulations cost less!
+          </div>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              onClick={handleBudgetCrisisReset}
+              className="px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-black font-bold text-xl rounded-lg hover:from-yellow-400 hover:to-orange-400 transition-all transform hover:scale-105 shadow-lg"
+            >
+              🔄 Start Over Completely
+            </button>
           </div>
         </div>
       )}

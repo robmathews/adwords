@@ -88,7 +88,7 @@ export interface BudgetConfig {
 export interface CampaignCosts {
   baseCampaignSetup: number;
   demographicResearch: number; // Cost per demographic
-  marketTesting: number; // Cost per simulation batch
+  marketingCost: number;
   total: number;
 }
 
@@ -203,23 +203,21 @@ export const ACHIEVEMENTS = {
 
 export type Achievement = typeof ACHIEVEMENTS[keyof typeof ACHIEVEMENTS];
 
-// NEW: Helper functions for budget calculations
 export function calculateCampaignCosts(
   budgetLevel: BudgetLevel,
   demographicsCount: number,
-  simulationsPerDemo: number
+  marketingCost: number = 0
 ): CampaignCosts {
   const config = BUDGET_LEVELS[budgetLevel];
 
   const baseCampaignSetup = config.campaignCost;
   const demographicResearch = demographicsCount * 200; // Research cost per demographic
-  const marketTesting = demographicsCount * simulationsPerDemo * 2; // $2 per simulation
 
   return {
     baseCampaignSetup,
     demographicResearch,
-    marketTesting,
-    total: baseCampaignSetup + demographicResearch + marketTesting
+    marketingCost,
+    total: baseCampaignSetup + demographicResearch + marketingCost
   };
 }
 

@@ -1,5 +1,5 @@
 // frontend/src/App.tsx
-// Updated App component with budget system and bankruptcy mechanics
+// Updated App component with proper campaign reset functionality
 
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
@@ -35,6 +35,7 @@ import {
 import { estimateDemographicSize, calculateDemographicRevenue, calculateDemographicProfit } from './utils/DemographicSizing';
 import { DEFAULT_PRODUCT_SUGGESTIONS, getSuggestedPricing } from './utils/ProductSuggestions';
 import { formatMarketSize, calculateTotalMarketSize } from './utils/DemographicSizing';
+import { calculateMarketingCost } from './utils/MarketingChannels';
 
 type AppStep =
   | 'budget-selection'        // NEW: Choose difficulty level
@@ -165,6 +166,24 @@ function App() {
       isBankrupt: false
     }));
 
+    // Clear all campaign state for fresh start
+    setCurrentRun(null);
+    setLastRun(null);
+    setDemographics([]);
+    setSimulationConfig(null);
+    setSimulationsCompleted(0);
+    setTotalSimulations(0);
+    setCurrentDemographicId(null);
+    setCurrentVariantId(null);
+    setRecentResponses([]);
+
+    // Reset form state to defaults
+    setInitialProductDescription('Baseball caps based on video game characters. concentrate on anime and manga characters.');
+    setInitialTagline('Live the life');
+    setTargetMarket('Video gamers');
+    setSalesPrice(49.99);
+    setUnitCost(15.00);
+
     setCurrentStep('suggestion');
   };
 
@@ -174,7 +193,7 @@ function App() {
 
   // NEW: Check if player can afford a campaign
   const checkCampaignAffordability = (demographicsCount: number, simulationsPerDemo: number = 10): boolean => {
-    const costs = calculateCampaignCosts(gameState.finances.budgetLevel, demographicsCount, simulationsPerDemo);
+    const costs = calculateCampaignCosts(gameState.finances.budgetLevel, demographicsCount);
     return canAffordCampaign(gameState.finances.currentBudget, costs);
   };
 
@@ -193,7 +212,7 @@ function App() {
   };
 
   const checkBankruptcy = (): boolean => {
-    const minCampaignCost = calculateCampaignCosts(gameState.finances.budgetLevel, 1, 10).total;
+    const minCampaignCost = calculateCampaignCosts(gameState.finances.budgetLevel, 1).total;
     return gameState.finances.currentBudget < minCampaignCost;
   };
 
@@ -227,7 +246,7 @@ function App() {
       timestamp: new Date(),
       // NEW: Budget fields
       budgetLevel: gameState.finances.budgetLevel,
-      campaignCosts: { baseCampaignSetup: 0, demographicResearch: 0, marketTesting: 0, total: 0 },
+      campaignCosts: { baseCampaignSetup: 0, demographicResearch: 0, marketingCost: 0, total: 0 },
       netProfit: 0,
       roi: 0
     };
@@ -244,7 +263,7 @@ function App() {
     }));
 
     // Check if can afford this campaign
-    const costs = calculateCampaignCosts(gameState.finances.budgetLevel, demographicsWithSizes.length, 10);
+    const costs = calculateCampaignCosts(gameState.finances.budgetLevel, demographicsWithSizes.length);
 
     if (!canAffordCampaign(gameState.finances.currentBudget, costs)) {
       // Force bankruptcy
@@ -273,7 +292,7 @@ function App() {
     }));
 
     // Recalculate costs based on updated demographics
-    const newCosts = calculateCampaignCosts(gameState.finances.budgetLevel, demographicsWithSizes.length, 10);
+    const newCosts = calculateCampaignCosts(gameState.finances.budgetLevel, demographicsWithSizes.length);
 
     // Check if still affordable
     if (!canAffordCampaign(gameState.finances.currentBudget, newCosts)) {
@@ -308,10 +327,15 @@ function App() {
 
     // Recalculate costs based on final demographics
     const selectedDemographics = demographics.filter(d => config.selectedDemographics.includes(d.id));
+
+    // Marketing strategy costs
+    const marketingCost = currentRun.marketingStrategy ? calculateMarketingCost(currentRun.marketingStrategy) : 0;
+
+    // Base campaign costs (research + testing)
     const finalCosts = calculateCampaignCosts(
       gameState.finances.budgetLevel,
       selectedDemographics.length,
-      config.simulationsPerDemographic
+      marketingCost
     );
 
     // Final affordability check
@@ -371,7 +395,8 @@ function App() {
         {
           demographic,
           productDescription: currentRun.productDescription,
-          tagline: currentRun.tagline
+          tagline: currentRun.tagline,
+          salesPrice: currentRun.salesPrice
         },
         simulationsPerDemographic,
         (completed, total) => {
@@ -454,6 +479,7 @@ function App() {
 
   // NEW: Handle bankruptcy recovery
   const handleBankruptcyRestart = () => {
+    // Increment bankruptcy count
     setGameState(prev => ({
       ...prev,
       finances: {
@@ -462,18 +488,89 @@ function App() {
       },
       isBankrupt: false
     }));
+
+    // Clear all campaign state for fresh start
+    setCurrentRun(null);
+    setLastRun(null);
+    setDemographics([]);
+    setSimulationConfig(null);
+    setSimulationsCompleted(0);
+    setTotalSimulations(0);
+    setCurrentDemographicId(null);
+    setCurrentVariantId(null);
+    setRecentResponses([]);
+
+    // Reset form state to defaults
+    setInitialProductDescription('');
+    setInitialTagline('');
+    setTargetMarket('');
+    setSalesPrice(49.99);
+    setUnitCost(15.00);
+
+    // Go back to budget selection
     setCurrentStep('budget-selection');
   };
 
-  // Handle continuing with current run
+  // NEW: Complete reset function
+  const handleCompleteReset = () => {
+    if (window.confirm('Are you sure you want to reset everything? This will clear all your progress, campaign history, and return you to budget selection.')) {
+      // Clear localStorage
+      localStorage.removeItem('adwords_tycoon_game_state');
+
+      // Reset all state
+      setGameState({
+        playerName: '',
+        finances: {
+          currentBudget: 0,
+          totalSpent: 0,
+          totalRevenue: 0,
+          netWorth: 0,
+          campaignsRun: 0,
+          bankruptcies: 0,
+          budgetLevel: 'life-savings'
+        },
+        currentRun: null,
+        gameHistory: [],
+        isBankrupt: false,
+        achievements: [],
+        hasSubmittedToLeaderboard: false
+      });
+
+      // Clear all campaign state
+      setCurrentRun(null);
+      setLastRun(null);
+      setDemographics([]);
+      setSimulationConfig(null);
+      setSimulationsCompleted(0);
+      setTotalSimulations(0);
+      setCurrentDemographicId(null);
+      setCurrentVariantId(null);
+      setRecentResponses([]);
+
+      // Reset form state to defaults
+      setInitialProductDescription('Baseball caps based on video game characters. concentrate on anime and manga characters.');
+      setInitialTagline('Live the life');
+      setTargetMarket('Video gamers');
+      setSalesPrice(49.99);
+      setUnitCost(15.00);
+
+      // Go back to budget selection
+      setCurrentStep('budget-selection');
+    }
+  };
+
+  // Handle continuing with current run (FIXED)
   const handleContinueWithCurrentRun = () => {
     if (!currentRun) return;
 
+    // Move current run to last run for comparison
     setLastRun(currentRun);
+
+    // Clear current run state to start fresh
     setCurrentRun(null);
     setCurrentStep('suggestion');
 
-    // Reset other state
+    // Reset workflow state but keep the last run for comparison
     setDemographics([]);
     setSimulationConfig(null);
     setSimulationsCompleted(0);
@@ -481,22 +578,16 @@ function App() {
     setCurrentDemographicId(null);
     setCurrentVariantId(null);
     setRecentResponses([]);
+
+    // Reset form state to defaults for new campaign
+    setInitialProductDescription('');
+    setInitialTagline('');
+    setTargetMarket('');
+    setSalesPrice(49.99);
+    setUnitCost(15.00);
   };
 
-  // Handle starting fresh (keep finances)
-  const handleStartFresh = () => {
-    setCurrentRun(null);
-    setCurrentStep('suggestion');
 
-    // Reset workflow state but keep finances
-    setDemographics([]);
-    setSimulationConfig(null);
-    setSimulationsCompleted(0);
-    setTotalSimulations(0);
-    setCurrentDemographicId(null);
-    setCurrentVariantId(null);
-    setRecentResponses([]);
-  };
 
   const handleSaveToLeaderboard = async () => {
     if (!currentRun || !gameState.playerName.trim()) {
@@ -667,6 +758,7 @@ function App() {
               }}
               onUpdatePricing={handleUpdatePricing}
               onUpdatePlayerName={(name) => setGameState(prev => ({ ...prev, playerName: name }))}
+              onCompleteReset={handleCompleteReset}
               productSuggestions={DEFAULT_PRODUCT_SUGGESTIONS}
             />
           )}
@@ -706,8 +798,9 @@ function App() {
                 unitCost: currentRun.unitCost
               }]}
               gameState={gameState}
+              marketingStrategy={currentRun.marketingStrategy}
               onStartSimulation={handleStartSimulation}
-              onBack={() => setCurrentStep('manage-demographics')}
+              onBack={() => setCurrentStep('marketing-strategy')}
             />
           )}
 
@@ -738,7 +831,7 @@ function App() {
               playerName={gameState.playerName}
               gameState={gameState} // NEW: Pass game state
               onContinueWithCurrentRun={handleContinueWithCurrentRun}
-              onStartFresh={handleStartFresh}
+              onStartFresh={handleCompleteReset}
               onSaveToLeaderboard={handleSaveToLeaderboard}
               onViewLeaderboard={handleViewLeaderboard}
               isSavingToLeaderboard={isSavingToLeaderboard}
@@ -749,7 +842,7 @@ function App() {
             <LeaderboardComponent
               leaderboard={leaderboard}
               currentRun={currentRun}
-              onStartNewCampaign={handleStartFresh}
+              onStartNewCampaign={handleCompleteReset}
               onBackToResults={() => currentRun ? setCurrentStep('comparison') : setCurrentStep('suggestion')}
             />
           )}
@@ -772,7 +865,7 @@ function App() {
                 <div className="grid grid-cols-3 gap-2 text-xs text-gray-400">
                   <div>Setup: {formatCurrency(currentRun.campaignCosts.baseCampaignSetup)}</div>
                   <div>Research: {formatCurrency(currentRun.campaignCosts.demographicResearch)}</div>
-                  <div>Testing: {formatCurrency(currentRun.campaignCosts.marketTesting)}</div>
+                  <div>Marketing Cost: {formatCurrency(currentRun.campaignCosts.marketingCost)}</div>
                 </div>
               </div>
 
