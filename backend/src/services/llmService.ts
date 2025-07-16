@@ -505,10 +505,18 @@ export async function simulateResponse(params: SimulationParams): Promise<LLMRes
 
           You are browsing online and see an advertisement for the following product:
 
-          Product: ${params.productDescription}
           Tagline: "${params.tagline}"
           Price: $${params.salesPrice}
+          Product Category: : ${params.productDescription.split(' ').slice(0, 3).join(' ')}
 
+          This is what appears in the ad preview - you would only see the full product description and details if you click through to learn more.
+          The full product description is: "${params.productDescription}"
+
+          IMPORTANT: Be realistic about consumer behavior. Most people (70-80%) typically ignore ads they see online, especially if:
+          - The product doesn't directly solve a current problem they have
+          - The price seems too high for their budget
+          - They're not actively shopping for this type of product
+          - The ad doesn't immediately grab their attention
 
           Consider the price point in relation to this demographic's typical spending power based on their socioeconomic profile (${params.demographic.mosaicCategory}) and age range.
           Factor in whether this price seems reasonable, expensive, or cheap for someone in this demographic when making your decision.
