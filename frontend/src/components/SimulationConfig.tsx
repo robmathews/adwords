@@ -121,11 +121,11 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
   return (
     <div className="max-w-4xl mx-auto">
       <div className="bg-white rounded-lg shadow-lg p-6">
-        <h2 className="text-xl font-semibold mb-4">Configure A/B Testing Simulation</h2>
+        <h2 className="text-xl font-semibold mb-4">Configure Campaign Testing Simulation</h2>
 
-        {/* A/B Testing Variants Display */}
+        {/* Campaign Campaign Variants Display */}
         <div className="mb-6">
-          <h3 className="text-lg font-medium text-gray-800 mb-3">Testing Variants</h3>
+          <h3 className="text-lg font-medium text-gray-800 mb-3">Campaign Variants</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {productVariants.map((variant, index) => (
               <div key={variant.id} className="border rounded-lg p-3 bg-blue-50">
@@ -268,7 +268,7 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
         )}
 
         <div className="bg-indigo-50 rounded-lg p-4 mb-6">
-          <h3 className="font-medium text-indigo-800 mb-2">A/B Testing Summary</h3>
+          <h3 className="font-medium text-indigo-800 mb-2">Campaign Testing Summary</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="text-gray-600">Selected Demographics:</span>
@@ -277,7 +277,7 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
               </span>
             </div>
             <div>
-              <span className="text-gray-600">Test Variants:</span>
+              <span className="text-gray-600">Campaign Variants:</span>
               <span className="ml-2 font-medium">{productVariants.length}</span>
             </div>
             <div>
@@ -306,13 +306,13 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
         </div>
 
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-          <h3 className="font-medium text-yellow-800 mb-2">📊 What You'll Get</h3>
+          <h3 className="font-medium text-yellow-800 mb-2">📊 Campaign Results You'll Get</h3>
           <ul className="text-sm text-yellow-700 space-y-1">
             <li>• Performance comparison across all {productVariants.length} variants</li>
             <li>• Demographic-specific responses for each variant</li>
             <li>• Best performing variant identification</li>
             <li>• Engagement and conversion rates by demographic</li>
-            <li>• Statistical significance of differences between variants</li>
+            <li>• Performance comparison between campaign variants</li>
           </ul>
         </div>
 
@@ -331,7 +331,7 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
             disabled={!isConfigValid}
             className={`btn-primary ${!isConfigValid ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            Start A/B Testing
+            Start Campaign Testing
           </button>
         </div>
       </div>

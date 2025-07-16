@@ -84,7 +84,7 @@ export const SimulationProgress: React.FC<SimulationProgressProps> = ({
   return (
     <div className="max-w-5xl mx-auto">
       <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">A/B Testing Progress</h2>
+        <h2 className="text-xl font-semibold mb-4">Campaign Testing Progress</h2>
 
         <div className="mb-6">
           <div className="flex justify-between text-sm text-gray-600 mb-1">
@@ -114,7 +114,7 @@ export const SimulationProgress: React.FC<SimulationProgressProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div className="bg-blue-50 rounded-lg p-4">
-            <h3 className="font-medium text-blue-800 mb-2">Testing Combinations</h3>
+            <h3 className="font-medium text-blue-800 mb-2">Campaign Combinations</h3>
             <div className="text-sm text-blue-700">
               <p>Completed: {completedCombinationsCount} of {totalCombinations}</p>
               <p>Demographics: {testingDemographics.length}</p>
@@ -168,7 +168,7 @@ export const SimulationProgress: React.FC<SimulationProgressProps> = ({
         )}
 
         <div className="mb-6">
-          <h3 className="font-medium text-gray-800 mb-2">Testing Matrix Progress:</h3>
+          <h3 className="font-medium text-gray-800 mb-2">Campaign Matrix Progress:</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
             {testingDemographics.map(demo =>
               productVariants.map(variant => {

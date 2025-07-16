@@ -299,10 +299,10 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
         )}
       </div>
 
-      {/* Statistical Analysis (only show when comparing two runs) */}
+      {/* Campaign Performance Analysis (only show when comparing two runs) */}
       {statisticalAnalysis && comparison !== 'first_run' && (
         <div className="bg-white rounded-lg shadow-lg p-6">
-          <h3 className="text-xl font-semibold mb-4">Statistical Analysis</h3>
+          <h3 className="text-xl font-semibold mb-4">Campaign Performance Analysis</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-gray-50 p-4 rounded-lg">
               <h4 className="font-medium mb-2">Statistical Significance</h4>

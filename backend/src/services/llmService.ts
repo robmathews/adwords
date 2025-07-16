@@ -314,7 +314,7 @@ export async function generateOptimizedSuggestion(
 }
 
 /**
- * Generate product suggestions using multiple strategies for A/B testing
+ * Generate product suggestions using multiple strategies for campaign testing
  */
 export async function generateProductSuggestions(
   params: ProductSuggestionParams
@@ -329,7 +329,7 @@ export async function generateProductSuggestions(
       messages: [
         {
           role: "user",
-          content: `Generate 3 DRAMATICALLY DIFFERENT variations of product descriptions and taglines for A/B testing:
+          content: `Generate 3 DRAMATICALLY DIFFERENT variations of product descriptions and taglines for campaign testing:
 
           Original Product Description: ${params.productDescription}
           Target Market: ${params.targetMarket}

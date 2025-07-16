@@ -176,7 +176,7 @@ export const PRESET_MARKETING_STRATEGIES = {
     allocations: [
       { channelId: 'email_marketing', spend: 300, targetDemographics: ['all'] },
       { channelId: 'content_marketing', spend: 400, targetDemographics: ['all'] },
-      { channelId: 'facebook_ads', spend: 300, targetDemographics: ['18-24', '25-34', '35-44'] }
+      { channelId: 'facebook_ads', spend: 300, targetDemographics: ['all'] }
     ]
   },
   balanced: {
@@ -185,7 +185,7 @@ export const PRESET_MARKETING_STRATEGIES = {
     description: "Mix of proven channels with moderate risk and steady returns",
     allocations: [
       { channelId: 'google_ads', spend: 2000, targetDemographics: ['all'] },
-      { channelId: 'facebook_ads', spend: 1500, targetDemographics: ['18-24', '25-34', '35-44', '45-54'] },
+      { channelId: 'facebook_ads', spend: 1500, targetDemographics: ['all'] },
       { channelId: 'email_marketing', spend: 800, targetDemographics: ['all'] },
       { channelId: 'content_marketing', spend: 700, targetDemographics: ['all'] }
     ]
@@ -196,9 +196,9 @@ export const PRESET_MARKETING_STRATEGIES = {
     description: "High-spend, multi-channel approach for rapid market penetration",
     allocations: [
       { channelId: 'google_ads', spend: 5000, targetDemographics: ['all'] },
-      { channelId: 'facebook_ads', spend: 4000, targetDemographics: ['18-24', '25-34', '35-44', '45-54'] },
-      { channelId: 'linkedin_ads', spend: 3000, targetDemographics: ['25-34', '35-44', '45-54'] },
-      { channelId: 'influencer_marketing', spend: 3000, targetDemographics: ['18-24', '25-34', '35-44'] }
+      { channelId: 'facebook_ads', spend: 4000, targetDemographics: ['all'] },
+      { channelId: 'linkedin_ads', spend: 3000, targetDemographics: ['all'] },
+      { channelId: 'influencer_marketing', spend: 3000, targetDemographics: ['all'] }
     ]
   }
 };
@@ -215,25 +215,29 @@ export function calculateChannelReach(
     channel.maxReach,
     channel.maxReach * (1 - Math.exp(-spendRatio * channel.scalingEfficiency))
   );
-  
+
   // Demographic affinity modifier
   let demographicModifier = 1.0;
-  if (channel.demographics.includes('all') || 
+  if (channel.demographics.includes('all') ||
       channel.demographics.includes(demographic.age)) {
     demographicModifier = 1.0;
   } else {
     demographicModifier = 0.5; // Reduced effectiveness for non-target demographics
   }
-  
+
   return baseReach * demographicModifier;
 }
 
 // Calculate total cost for a marketing strategy
 export function calculateMarketingCost(strategy: MarketingStrategy): number {
+  if (!strategy || !strategy.channelAllocations) {
+    return 0;
+  }
+
   return strategy.channelAllocations.reduce((total, allocation) => {
     const channel = MARKETING_CHANNELS.find(c => c.id === allocation.channelId);
     if (!channel) return total;
-    
+
     switch (channel.costType) {
       case 'flat':
         return total + channel.baseCost;
@@ -252,18 +256,32 @@ export function calculateTotalMarketPenetration(
   strategy: MarketingStrategy,
   demographic: Demographics
 ): number {
+  if (!strategy || !strategy.channelAllocations) {
+    console.warn('Invalid marketing strategy provided to calculateTotalMarketPenetration');
+    return 0.005; // Default penetration rate
+  }
+
   let totalReach = 0;
-  
+
   for (const allocation of strategy.channelAllocations) {
     const channel = MARKETING_CHANNELS.find(c => c.id === allocation.channelId);
-    if (!channel || !allocation.targetDemographics.includes(demographic.id)) {
+    if (!channel) continue;
+
+    // Check if this channel targets this demographic
+    // Use 'all' as fallback if no targetDemographics or if demographic.id is missing
+    const targetsDemographic = !allocation.targetDemographics ||
+      allocation.targetDemographics.length === 0 ||
+      allocation.targetDemographics.includes('all') ||
+      allocation.targetDemographics.includes(demographic.id);
+
+    if (!targetsDemographic) {
       continue;
     }
-    
+
     const channelReach = calculateChannelReach(channel, allocation.spend, demographic);
     totalReach += channelReach;
   }
-  
+
   // Prevent over 100% reach and apply diminishing returns for multiple channels
   return Math.min(0.95, totalReach * 0.85); // 15% overlap penalty for multiple channels
 }
@@ -273,26 +291,39 @@ export function calculateChannelModifiers(
   strategy: MarketingStrategy,
   demographic: Demographics
 ): { conversionBoost: number; engagementBoost: number } {
+  if (!strategy || !strategy.channelAllocations) {
+    console.warn('Invalid marketing strategy provided to calculateChannelModifiers');
+    return { conversionBoost: 1.0, engagementBoost: 1.0 };
+  }
+
   let weightedConversionBoost = 0;
   let weightedEngagementBoost = 0;
   let totalWeight = 0;
-  
+
   for (const allocation of strategy.channelAllocations) {
     const channel = MARKETING_CHANNELS.find(c => c.id === allocation.channelId);
-    if (!channel || !allocation.targetDemographics.includes(demographic.id)) {
+    if (!channel) continue;
+
+    // Check if this channel targets this demographic
+    const targetsDemographic = !allocation.targetDemographics ||
+      allocation.targetDemographics.length === 0 ||
+      allocation.targetDemographics.includes('all') ||
+      allocation.targetDemographics.includes(demographic.id);
+
+    if (!targetsDemographic) {
       continue;
     }
-    
+
     const weight = allocation.spend;
     weightedConversionBoost += channel.conversionBoost * weight;
     weightedEngagementBoost += channel.engagementBoost * weight;
     totalWeight += weight;
   }
-  
+
   if (totalWeight === 0) {
     return { conversionBoost: 1.0, engagementBoost: 1.0 };
   }
-  
+
   return {
     conversionBoost: weightedConversionBoost / totalWeight,
     engagementBoost: weightedEngagementBoost / totalWeight
@@ -317,23 +348,23 @@ export function calculateDemographicRevenueWithMarketing(
 } {
   const marketSize = demographic.estimatedSize || estimateDemographicSize(demographic);
   const baseConversionRate = simulationResult.responses.followAndBuy / simulationResult.totalSims;
-  
+
   // Calculate effective reach and modifiers
   const marketPenetration = calculateTotalMarketPenetration(marketingStrategy, demographic);
   const modifiers = calculateChannelModifiers(marketingStrategy, demographic);
-  
+
   // Apply channel modifiers to conversion rate
   const effectiveConversionRate = baseConversionRate * modifiers.conversionBoost;
-  
+
   // Calculate reach and sales
   const peopleReached = Math.floor(marketSize * marketPenetration);
   const estimatedPurchases = Math.floor(peopleReached * effectiveConversionRate);
   const revenue = estimatedPurchases * salesPrice;
   const profit = estimatedPurchases * (salesPrice - unitCost);
-  
+
   // Calculate marketing cost for this demographic (proportional allocation)
   const totalMarketingCost = calculateMarketingCost(marketingStrategy);
-  const demographicMarketingCost = totalMarketingCost / marketingStrategy.channelAllocations.length;
+  const demographicMarketingCost = totalMarketingCost / (marketingStrategy.channelAllocations?.length || 1);
   
   const netProfit = profit - demographicMarketingCost;
   const costPerAcquisition = estimatedPurchases > 0 ? demographicMarketingCost / estimatedPurchases : 0;

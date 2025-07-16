@@ -36,7 +36,11 @@ export const MarketingStrategySelector: React.FC<MarketingStrategySelectorProps>
     const scaledAllocations = preset.allocations.map(allocation => ({
       ...allocation,
       spend: allocation.spend * budgetRatio,
-      targetDemographics: demographics.map(d => d.id) // Target all demographics
+      targetDemographics: allocation.targetDemographics.includes('all')
+        ? demographics.map(d => d.id) // Convert 'all' to actual demographic IDs
+        : allocation.targetDemographics.filter(id =>
+            demographics.some(d => d.id === id) // Only include valid demographic IDs
+          )
     }));
 
     return {

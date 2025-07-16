@@ -1,13 +1,13 @@
 // frontend/src/types/index.ts
-
+// Enhanced types with budget system and marketing strategy integration
 
 // Define our app's main data types
 export interface ProductVariant {
   id: string;
   productDescription: string;
   tagline: string;
-  salesPrice: number; // New: price per unit
-  unitCost: number; // New: cost per unit
+  salesPrice: number;
+  unitCost: number;
 }
 
 export type Demographics = {
@@ -17,7 +17,7 @@ export type Demographics = {
   interests: string[];
   mosaicCategory: string;
   description: string;
-  estimatedSize?: number; // New: estimated demographic size in thousands
+  estimatedSize?: number;
 };
 
 export type SimulationResult = {
@@ -30,63 +30,11 @@ export type SimulationResult = {
     followAndSave: number;
   };
   totalSims: number;
-  estimatedRevenue?: number; // New: calculated revenue for this demographic
-  estimatedProfit?: number; // New: calculated profit for this demographic
+  estimatedRevenue?: number;
+  estimatedProfit?: number;
 };
 
-export type TestRun = {
-  id: string;
-  productDescription: string;
-  tagline: string;
-  targetMarket: string;
-  salesPrice: number; // New: price per unit
-  unitCost: number; // New: cost per unit
-  demographics: Demographics[];
-  results: SimulationResult[];
-  conversionRate: number;
-  engagementRate: number;
-  totalRevenue: number; // New: total revenue across all demographics (SCORE)
-  totalProfit: number; // New: total profit across all demographics
-  timestamp: Date;
-  marketingStrategy?: MarketingStrategy;
-  marketingCost?: number; // Total marketing spend
-  netProfit?: number; // Profit after marketing costs
-  costPerAcquisition?: number; // Marketing cost per customer acquired
-  returnOnAdSpend?: number; // Revenue / Marketing Cost
-};
-
-// New: Leaderboard system
-export interface LeaderboardEntry {
-  id: string;
-  playerName: string;
-  productDescription: string;
-  tagline: string;
-  totalRevenue: number;
-  totalProfit: number;
-  conversionRate: number;
-  engagementRate: number;
-  timestamp: Date;
-}
-
-// New: Product suggestion with pricing
-export interface ProductSuggestion {
-  productDescription: string;
-  tagline: string;
-  salesPrice: number;
-  unitCost: number;
-  targetMarket: string;
-}
-
-// New: Product suggestion with pricing
-export interface ProductSuggestion {
-  productDescription: string;
-  tagline: string;
-  salesPrice: number;
-  unitCost: number;
-  targetMarket: string;
-}
-
-// Marketing Channel System Types
+// Marketing Channel Types
 export interface MarketingChannel {
   id: string;
   name: string;
@@ -123,3 +71,203 @@ export interface MarketingStrategy {
   duration: number; // Campaign duration in days/weeks
 }
 
+// NEW: Budget difficulty levels
+export type BudgetLevel = 'trust-fund-kid' | 'life-savings' | 'bartender';
+
+export interface BudgetConfig {
+  level: BudgetLevel;
+  startingBudget: number;
+  campaignCost: number;
+  simulationCostPerDemo: number;
+  name: string;
+  description: string;
+  emoji: string;
+}
+
+// NEW: Campaign costs breakdown
+export interface CampaignCosts {
+  baseCampaignSetup: number;
+  demographicResearch: number; // Cost per demographic
+  marketTesting: number; // Cost per simulation batch
+  total: number;
+}
+
+export type TestRun = {
+  id: string;
+  productDescription: string;
+  tagline: string;
+  targetMarket: string;
+  salesPrice: number;
+  unitCost: number;
+  demographics: Demographics[];
+  results: SimulationResult[];
+  conversionRate: number;
+  engagementRate: number;
+  totalRevenue: number;
+  totalProfit: number;
+  timestamp: Date;
+  budgetLevel: BudgetLevel;
+  campaignCosts: CampaignCosts;
+  netProfit: number; // Revenue - costs
+  roi: number; // Return on investment percentage
+  marketingStrategy: MarketingStrategy;
+};
+
+// NEW: Player financial state
+export interface PlayerFinances {
+  currentBudget: number;
+  totalSpent: number;
+  totalRevenue: number;
+  netWorth: number; // Current budget + total revenue - total spent
+  campaignsRun: number;
+  bankruptcies: number;
+  budgetLevel: BudgetLevel;
+}
+
+// NEW: Game state
+export interface GameState {
+  playerName: string;
+  finances: PlayerFinances;
+  currentRun: TestRun | null;
+  gameHistory: TestRun[];
+  isBankrupt: boolean;
+  achievements: string[];
+}
+
+export interface LeaderboardEntry {
+  id: string;
+  playerName: string;
+  productDescription: string;
+  tagline: string;
+  totalRevenue: number;
+  totalProfit: number;
+  conversionRate: number;
+  engagementRate: number;
+  timestamp: Date;
+  // NEW: Financial metrics
+  budgetLevel: BudgetLevel;
+  netProfit: number;
+  roi: number;
+  campaignsRun: number;
+}
+
+export interface ProductSuggestion {
+  productDescription: string;
+  tagline: string;
+  salesPrice: number;
+  unitCost: number;
+  targetMarket: string;
+}
+
+// NEW: Budget level configurations
+export const BUDGET_LEVELS: Record<BudgetLevel, BudgetConfig> = {
+  'trust-fund-kid': {
+    level: 'trust-fund-kid',
+    startingBudget: 100000,
+    campaignCost: 2000,
+    simulationCostPerDemo: 100,
+    name: 'Trust Fund Kid',
+    description: 'Daddy\'s money makes everything easier',
+    emoji: '💰'
+  },
+  'life-savings': {
+    level: 'life-savings',
+    startingBudget: 25000,
+    campaignCost: 1500,
+    simulationCostPerDemo: 75,
+    name: 'Life Savings',
+    description: 'Everything you\'ve saved is on the line',
+    emoji: '💳'
+  },
+  'bartender': {
+    level: 'bartender',
+    startingBudget: 5000,
+    campaignCost: 1000,
+    simulationCostPerDemo: 50,
+    name: 'Bartender',
+    description: 'Tips and night shifts fund your dreams',
+    emoji: '🍺'
+  }
+};
+
+// NEW: Achievement system
+export const ACHIEVEMENTS = {
+  FIRST_CAMPAIGN: 'first_campaign',
+  PROFITABLE_CAMPAIGN: 'profitable_campaign',
+  BANKRUPTCY_SURVIVOR: 'bankruptcy_survivor',
+  HIGH_ROI: 'high_roi', // 500%+ ROI
+  MILLIONAIRE: 'millionaire', // Net worth over $1M
+  SERIAL_ENTREPRENEUR: 'serial_entrepreneur', // 10+ campaigns
+  EFFICIENCY_EXPERT: 'efficiency_expert', // High profit with low budget level
+} as const;
+
+export type Achievement = typeof ACHIEVEMENTS[keyof typeof ACHIEVEMENTS];
+
+// NEW: Helper functions for budget calculations
+export function calculateCampaignCosts(
+  budgetLevel: BudgetLevel,
+  demographicsCount: number,
+  simulationsPerDemo: number
+): CampaignCosts {
+  const config = BUDGET_LEVELS[budgetLevel];
+
+  const baseCampaignSetup = config.campaignCost;
+  const demographicResearch = demographicsCount * 200; // Research cost per demographic
+  const marketTesting = demographicsCount * simulationsPerDemo * 2; // $2 per simulation
+
+  return {
+    baseCampaignSetup,
+    demographicResearch,
+    marketTesting,
+    total: baseCampaignSetup + demographicResearch + marketTesting
+  };
+}
+
+export function calculateROI(revenue: number, costs: number): number {
+  if (costs <= 0) return 0;
+  return ((revenue - costs) / costs) * 100;
+}
+
+export function canAffordCampaign(budget: number, costs: CampaignCosts): boolean {
+  return budget >= costs.total;
+}
+
+export function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount);
+}
+
+export function getBudgetStatusColor(budget: number, budgetLevel: BudgetLevel): string {
+  const maxBudget = BUDGET_LEVELS[budgetLevel].startingBudget;
+  const percentage = (budget / maxBudget) * 100;
+
+  if (percentage <= 0) return 'text-red-600'; // Bankrupt
+  if (percentage <= 10) return 'text-red-500'; // Critical
+  if (percentage <= 25) return 'text-orange-500'; // Warning
+  if (percentage <= 50) return 'text-yellow-500'; // Caution
+  return 'text-green-500'; // Healthy
+}
+
+// Default marketing strategy for fallback
+export function createDefaultMarketingStrategy(): MarketingStrategy {
+  return {
+    totalBudget: 1000,
+    channelAllocations: [
+      {
+        channelId: 'google_ads',
+        spend: 500,
+        targetDemographics: ['all']
+      },
+      {
+        channelId: 'facebook_ads',
+        spend: 500,
+        targetDemographics: ['all']
+      }
+    ],
+    duration: 30
+  };
+}

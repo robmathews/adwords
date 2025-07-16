@@ -39,7 +39,7 @@ export const generateOptimizedSuggestion = async (req: Request, res: Response) =
 };
 
 /**
- * Generate product description and tagline suggestions for A/B testing
+ * Generate product description and tagline suggestions for campaign testing
  * (keeping for backward compatibility)
  */
 export const generateSuggestions = async (req: Request, res: Response) => {

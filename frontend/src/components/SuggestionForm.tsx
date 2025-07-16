@@ -1,8 +1,8 @@
 // frontend/src/components/SuggestionForm.tsx
-// Updated SuggestionForm with pricing inputs and tycoon features
+// Updated SuggestionForm with budget system integration
 
 import React, { useState } from 'react';
-import { TestRun, ProductSuggestion } from '../types';
+import { TestRun, ProductSuggestion, GameState, BUDGET_LEVELS, calculateCampaignCosts, formatCurrency, getBudgetStatusColor } from '../types';
 import { LLMService } from '../services/LLMService';
 import { LeaderboardService } from '../services/LeaderboardService';
 
@@ -14,7 +14,8 @@ interface SuggestionFormProps {
   unitCost: number;
   playerName: string;
   lastRun: TestRun | null;
-  onAcceptSuggestion: (productDescription: string, market: string,  tagline: string, salesPrice?: number, unitCost?: number) => void;
+  gameState: GameState; // NEW: Game state for budget checking
+  onAcceptSuggestion: (productDescription: string, market: string, tagline: string, salesPrice?: number, unitCost?: number) => void;
   onUpdateInitialData: (productDescription: string, tagline: string, targetMarket: string) => void;
   onUpdatePricing: (salesPrice: number, unitCost: number) => void;
   onUpdatePlayerName: (playerName: string) => void;
@@ -37,6 +38,7 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
   unitCost,
   playerName,
   lastRun,
+  gameState, // NEW
   onAcceptSuggestion,
   onUpdateInitialData,
   onUpdatePricing,
@@ -62,6 +64,11 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
     playerName: ''
   });
 
+  // NEW: Calculate estimated campaign costs
+  const estimatedCosts = calculateCampaignCosts(gameState.finances.budgetLevel, 3, 10); // Estimate 3 demographics, 10 sims each
+  const canAffordEstimate = gameState.finances.currentBudget >= estimatedCosts.total;
+  const budgetAfterCampaign = gameState.finances.currentBudget - estimatedCosts.total;
+
   const validateForm = (): boolean => {
     const newErrors = {
       productDescription: productDescription.trim() === '' ? 'Product description is required' : '',
@@ -80,19 +87,22 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
   const handleGenerateSuggestion = async () => {
     if (!validateForm()) return;
 
-    // Update parent component with current data
+    // NEW: Budget check before generating
+    if (!canAffordEstimate) {
+      alert(`You can't afford a typical campaign! You need at least ${formatCurrency(estimatedCosts.total)} but only have ${formatCurrency(gameState.finances.currentBudget)}.`);
+      return;
+    }
+
     onUpdateInitialData(productDescription, tagline, market);
     onUpdatePricing(currentSalesPrice, currentUnitCost);
 
     setIsGenerating(true);
     try {
-      // Call LLM service to get a single optimized suggestion
       const suggestions = await LLMService.generateProductSuggestions({
         productDescription,
         targetMarket: market
       });
 
-      // Take the first (emotional appeal) suggestion and add current pricing
       const newSuggestion: Suggestion = {
         productDescription: suggestions.productDescriptions[0] || productDescription,
         targetMarket: market,
@@ -102,11 +112,10 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
       };
 
       setSuggestion(newSuggestion);
-      setEditedSuggestion(newSuggestion); // Initialize edited version
-      setIsEditing(false); // Reset editing state
+      setEditedSuggestion(newSuggestion);
+      setIsEditing(false);
     } catch (error) {
       console.error('Error generating suggestion:', error);
-      // Create a fallback suggestion
       const fallbackSuggestion: Suggestion = {
         productDescription: productDescription,
         targetMarket: market,
@@ -139,18 +148,24 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
   };
 
   const handleCancelEditing = () => {
-    setEditedSuggestion(suggestion); // Reset to original suggestion
+    setEditedSuggestion(suggestion);
     setIsEditing(false);
   };
 
   const handleSaveEdits = () => {
     if (editedSuggestion) {
-      setSuggestion(editedSuggestion); // Save the edited version
+      setSuggestion(editedSuggestion);
       setIsEditing(false);
     }
   };
 
   const handleAcceptSuggestion = () => {
+    // NEW: Final budget check
+    if (!canAffordEstimate) {
+      alert(`Campaign too expensive! Reduce your scope or choose easier difficulty.`);
+      return;
+    }
+
     const finalSuggestion = editedSuggestion || suggestion;
     if (finalSuggestion) {
       onAcceptSuggestion(
@@ -165,6 +180,13 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
 
   const handleUseAsIs = () => {
     if (!validateForm()) return;
+
+    // NEW: Budget check
+    if (!canAffordEstimate) {
+      alert(`Campaign too expensive! You need ${formatCurrency(estimatedCosts.total)} but only have ${formatCurrency(gameState.finances.currentBudget)}.`);
+      return;
+    }
+
     onAcceptSuggestion(productDescription, market, tagline, currentSalesPrice, currentUnitCost);
   };
 
@@ -175,16 +197,78 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
   const calculateProfit = (price: number, cost: number) => price - cost;
   const calculateMargin = (price: number, cost: number) => price > 0 ? ((price - cost) / price) * 100 : 0;
 
-  // Get the current suggestion to display (edited version if available, otherwise original)
   const displaySuggestion = editedSuggestion || suggestion;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {/* Budget Status Warning */}
+      {!canAffordEstimate && (
+        <div className="bg-red-500/20 border border-red-400/50 rounded-lg p-6 backdrop-blur-md">
+          <div className="flex items-center mb-3">
+            <span className="text-3xl mr-3">🚨</span>
+            <h3 className="text-lg font-semibold text-red-300">Budget Crisis!</h3>
+          </div>
+          <p className="text-red-200 mb-4">
+            You only have {formatCurrency(gameState.finances.currentBudget)} left, but a typical campaign costs around {formatCurrency(estimatedCosts.total)}.
+            You need to reduce your campaign scope or restart with an easier difficulty level.
+          </p>
+          <div className="text-sm text-red-300">
+            💡 Tip: Campaigns with fewer demographics and simulations cost less!
+          </div>
+        </div>
+      )}
+
+      {/* Budget Status Display */}
+      <div className="bg-white/10 backdrop-blur-md rounded-lg p-4 text-white">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-semibold text-yellow-300">💰 Financial Status</h3>
+          <div className="text-sm text-gray-300">
+            {BUDGET_LEVELS[gameState.finances.budgetLevel].emoji} {BUDGET_LEVELS[gameState.finances.budgetLevel].name} Mode
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="text-center">
+            <div className={`text-xl font-bold ${getBudgetStatusColor(gameState.finances.currentBudget, gameState.finances.budgetLevel)}`}>
+              {formatCurrency(gameState.finances.currentBudget)}
+            </div>
+            <div className="text-sm text-gray-400">Current Budget</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold text-red-400">
+              {formatCurrency(estimatedCosts.total)}
+            </div>
+            <div className="text-sm text-gray-400">Est. Campaign Cost</div>
+          </div>
+          <div className="text-center">
+            <div className={`text-xl font-bold ${budgetAfterCampaign >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {formatCurrency(budgetAfterCampaign)}
+            </div>
+            <div className="text-sm text-gray-400">Budget After</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold text-blue-400">
+              {gameState.finances.campaignsRun}
+            </div>
+            <div className="text-sm text-gray-400">Campaigns Run</div>
+          </div>
+        </div>
+
+        {/* Budget warning levels */}
+        {gameState.finances.currentBudget <= BUDGET_LEVELS[gameState.finances.budgetLevel].startingBudget * 0.25 && (
+          <div className="mt-3 text-center">
+            <span className="inline-flex items-center px-3 py-1 bg-orange-500/20 border border-orange-400/50 rounded-full text-orange-300 text-sm">
+              ⚠️ Low Budget Warning - Make this campaign count!
+            </span>
+          </div>
+        )}
+      </div>
+
       {/* Last Run Display with Revenue */}
       {lastRun && (
         <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-400/50 rounded-lg p-6 backdrop-blur-md">
           <h2 className="text-lg font-semibold text-green-300 mb-3">
-            🏆 Previous Best Campaign (Baseline)
+            🏆 Previous Campaign Results
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -206,29 +290,26 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
                 <div className="text-sm text-green-200">Revenue</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-400">
-                  {LeaderboardService.formatCurrency(lastRun.totalProfit)}
+                <div className={`text-2xl font-bold ${lastRun.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {LeaderboardService.formatCurrency(lastRun.netProfit)}
                 </div>
-                <div className="text-sm text-green-200">Profit</div>
+                <div className="text-sm text-green-200">Net Profit</div>
               </div>
             </div>
             <div className="flex items-center justify-around">
               <div className="text-center">
-                <div className="text-xl font-bold text-blue-400">
-                  {lastRun.conversionRate.toFixed(1)}%
+                <div className={`text-xl font-bold ${lastRun.roi >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {lastRun.roi >= 0 ? '+' : ''}{lastRun.roi.toFixed(1)}%
                 </div>
-                <div className="text-sm text-green-200">Conversion</div>
+                <div className="text-sm text-green-200">ROI</div>
               </div>
               <div className="text-center">
-                <div className="text-xl font-bold text-purple-400">
-                  {lastRun.engagementRate.toFixed(1)}%
+                <div className="text-xl font-bold text-red-400">
+                  {formatCurrency(lastRun.campaignCosts.total)}
                 </div>
-                <div className="text-sm text-green-200">Engagement</div>
+                <div className="text-sm text-green-200">Cost</div>
               </div>
             </div>
-          </div>
-          <div className="mt-3 text-xs text-green-300">
-            {lastRun.results.length} demographic(s) tested • {lastRun.results.reduce((sum, r) => sum + r.totalSims, 0)} total simulations
           </div>
         </div>
       )}
@@ -240,29 +321,12 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
         </h2>
         <p className="text-gray-300 mb-6">
           {lastRun
-            ? 'Create an optimized campaign to beat your baseline performance and grow your revenue!'
+            ? 'Create an optimized campaign to beat your previous performance and grow your empire!'
             : 'Build your marketing empire! Enter your product details and pricing to start earning.'
           }
         </p>
 
         <div className="space-y-4">
-          {/* Player Name */}
-          <div>
-            <label htmlFor="playerName" className="block text-sm font-medium text-gray-300 mb-1">
-              Tycoon Name 👑
-            </label>
-            <input
-              id="playerName"
-              className={`w-full px-4 py-3 rounded-lg bg-white/20 border text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 ${errors.playerName ? 'border-red-500' : 'border-white/30'}`}
-              placeholder="Enter your tycoon name..."
-              value={playerName}
-              onChange={(e) => onUpdatePlayerName(e.target.value)}
-            />
-            {errors.playerName && (
-              <p className="mt-1 text-sm text-red-400">{errors.playerName}</p>
-            )}
-          </div>
-
           {/* Quick Start Products */}
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium text-gray-300">Product Setup</h3>
@@ -320,20 +384,21 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
               <p className="mt-1 text-sm text-red-400">{errors.productDescription}</p>
             )}
           </div>
+
           <div>
             <label htmlFor="tagline" className="block text-sm font-medium text-gray-300 mb-1">
               Tagline
             </label>
             <textarea
               id="tagline"
-              className={`w-full px-4 py-3 rounded-lg bg-white/20 border text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 ${errors.productDescription ? 'border-red-500' : 'border-white/30'}`}
-              rows={3}
+              className={`w-full px-4 py-3 rounded-lg bg-white/20 border text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 ${errors.tagline ? 'border-red-500' : 'border-white/30'}`}
+              rows={2}
               placeholder="e.g., Experience the difference"
               value={tagline}
               onChange={(e) => setTagline(e.target.value)}
             />
-            {errors.productDescription && (
-              <p className="mt-1 text-sm text-red-400">{errors.productDescription}</p>
+            {errors.tagline && (
+              <p className="mt-1 text-sm text-red-400">{errors.tagline}</p>
             )}
           </div>
 
@@ -425,7 +490,12 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
           <button
             type="button"
             onClick={handleUseAsIs}
-            className="px-6 py-3 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-lg hover:from-gray-400 hover:to-gray-500 transition-all"
+            disabled={!canAffordEstimate}
+            className={`px-6 py-3 rounded-lg transition-all ${
+              canAffordEstimate
+                ? 'bg-gradient-to-r from-gray-500 to-gray-600 text-white hover:from-gray-400 hover:to-gray-500'
+                : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+            }`}
           >
             Use As-Is
           </button>
@@ -433,8 +503,12 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
           <button
             type="button"
             onClick={handleGenerateSuggestion}
-            disabled={isGenerating}
-            className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-black font-bold rounded-lg hover:from-yellow-400 hover:to-orange-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isGenerating || !canAffordEstimate}
+            className={`px-6 py-3 rounded-lg font-bold transition-all ${
+              canAffordEstimate && !isGenerating
+                ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-black hover:from-yellow-400 hover:to-orange-400'
+                : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+            }`}
           >
             {isGenerating ? (
               <>
@@ -446,6 +520,14 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
             )}
           </button>
         </div>
+
+        {!canAffordEstimate && (
+          <div className="mt-4 text-center">
+            <p className="text-red-400 text-sm">
+              💸 Insufficient budget for campaign launch. Consider restarting with easier difficulty.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Suggestion Display */}
@@ -609,9 +691,10 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
             <h4 className="font-medium text-blue-300 mb-2">🎯 What happens next:</h4>
             <ul className="text-sm text-blue-200 space-y-1">
               <li>• Generate demographics based on your target market</li>
+              <li>• Campaign costs will be deducted from your budget</li>
               <li>• Run simulations to test conversion rates</li>
-              <li>• Calculate total revenue based on market size</li>
-              {lastRun && <li>• Compare results with your baseline performance</li>}
+              <li>• Calculate total revenue and ROI</li>
+              {lastRun && <li>• Compare results with your previous performance</li>}
               <li>• Compete for the top spot on the leaderboard! 🏆</li>
             </ul>
           </div>
@@ -629,34 +712,38 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
             <button
               type="button"
               onClick={handleAcceptSuggestion}
-              className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-lg hover:from-green-400 hover:to-emerald-400 transition-all"
-              disabled={isEditing}
+              disabled={isEditing || !canAffordEstimate}
+              className={`px-6 py-3 font-bold rounded-lg transition-all ${
+                canAffordEstimate && !isEditing
+                  ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-400 hover:to-emerald-400'
+                  : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+              }`}
             >
-              🚀 Launch This Campaign!
+              {canAffordEstimate ? '🚀 Launch This Campaign!' : '💸 Can\'t Afford Campaign'}
             </button>
           </div>
         </div>
       )}
 
-      {/* Tycoon Game Explanation */}
+      {/* Enhanced Tycoon Game Explanation */}
       <div className="bg-white/5 backdrop-blur-md rounded-lg p-6 border border-white/20">
-        <h3 className="font-medium text-yellow-300 mb-3">🎮 AdWords Tycoon - How to Win:</h3>
+        <h3 className="font-medium text-yellow-300 mb-3">🎮 AdWords Tycoon - Budget Mode Rules:</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-300">
           <div>
-            <h4 className="font-medium text-white mb-2">💰 Build Revenue</h4>
-            <p>Your score is total revenue across all demographics. Higher conversion rates and better targeting = bigger profits!</p>
+            <h4 className="font-medium text-white mb-2">💰 Budget Management</h4>
+            <p>Every campaign costs money! Demographics cost more to research, simulations cost money to run. Spend wisely or go bankrupt!</p>
           </div>
           <div>
-            <h4 className="font-medium text-white mb-2">🎯 Optimize Strategy</h4>
-            <p>Test different products, pricing, and messaging. Each campaign teaches you what resonates with your market.</p>
+            <h4 className="font-medium text-white mb-2">🎯 Strategic Choices</h4>
+            <p>More demographics = higher costs but broader reach. Fewer demographics = lower costs but limited potential. Choose your strategy!</p>
           </div>
           <div>
-            <h4 className="font-medium text-white mb-2">📊 Scale Smart</h4>
-            <p>Larger demographics mean more potential customers, but niche targeting can drive higher conversion rates.</p>
+            <h4 className="font-medium text-white mb-2">📊 ROI is King</h4>
+            <p>Revenue minus costs = your real score. A $100k campaign that costs $95k is worse than a $50k campaign that costs $10k!</p>
           </div>
           <div>
-            <h4 className="font-medium text-white mb-2">🏆 Compete & Win</h4>
-            <p>Climb the leaderboard by creating campaigns that generate the highest total revenue. Be the ultimate marketing tycoon!</p>
+            <h4 className="font-medium text-white mb-2">🏆 Survival & Growth</h4>
+            <p>Survive multiple campaigns to prove you're a true tycoon. Each difficulty level tests different skills and risk tolerance!</p>
           </div>
         </div>
       </div>
