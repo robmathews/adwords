@@ -1,4 +1,8 @@
+// backend/src/services/llmService.ts
+// Fixed version that improves LLM prompting instead of bypassing it
+
 import Anthropic from '@anthropic-ai/sdk';
+import { parseJSON } from '../utils/jsonParser';
 
 // Types from your original code
 export type LLMResponse = {
@@ -228,6 +232,32 @@ function selectRandomStrategy(): MarketingStrategy {
 }
 
 /**
+ * Helper function to provide context about demographic and product match for LLM guidance
+ */
+function getProductMatchContext(
+  demographic: Demographics,
+  productDescription: string,
+  tagline: string,
+  salesPrice: number
+): string {
+  // Just provide context, let the LLM decide what to do with it
+  const priceThresholds = {
+    'Power Elite': 300,
+    'Affluent Achievers': 200,
+    'Rising Prosperity': 100,
+    'Comfortable Communities': 75,
+    'Urban Cohesion': 60,
+    'Suburban Mindsets': 50,
+    'Financially Stretched': 30,
+    'Modest Traditions': 25
+  };
+
+  const priceThreshold = priceThresholds[demographic.mosaicCategory as keyof typeof priceThresholds] || 50;
+
+  return `CONTEXT: Your demographic (${demographic.mosaicCategory}) typically has a comfort zone around ${priceThreshold} for discretionary purchases. This product costs ${salesPrice}. Your interests include: ${demographic.interests.join(', ')}.`;
+}
+
+/**
  * Generate a single optimized suggestion for iterative testing
  */
 export async function generateOptimizedSuggestion(
@@ -241,7 +271,6 @@ export async function generateOptimizedSuggestion(
 
   return withRetry(async () => {
     const response = await anthropic.messages.create({
-      // model: "claude-3-5-haiku-latest",
       model: "claude-3-5-sonnet-latest",
       max_tokens: 800,
       system: "You are an expert marketing copywriter who creates dramatically different variations that transform products into irresistible offers.",
@@ -282,7 +311,7 @@ export async function generateOptimizedSuggestion(
           Return only the JSON with no additional text.`
         }
       ],
-      temperature: 0.9, // Higher temperature for more creative variations
+      temperature: 0.9,
     });
 
     // Extract and parse response
@@ -301,8 +330,7 @@ export async function generateOptimizedSuggestion(
     }
 
     try {
-      const suggestion = JSON.parse(jsonContent) as OptimizedSuggestion;
-      // Add the strategy name to the reasoning if not already included
+      const suggestion = parseJSON(jsonContent) as OptimizedSuggestion;
       if (!suggestion.reasoning.toLowerCase().includes(strategy.name.replace('_', ' '))) {
         suggestion.reasoning = `Used ${strategy.name.replace('_', ' ')} strategy. ${suggestion.reasoning}`;
       }
@@ -341,26 +369,18 @@ export async function generateProductSuggestions(
           - Focus on identity, belonging, and feelings
           - Use sensory language and lifestyle imagery
           - Make them feel like they're joining something special
-          - Example: "Running shoes" → "Feel invincible with every stride. Join the dawn patrol runners who own the morning."
 
           VERSION 2 - PROBLEM/SOLUTION with URGENCY:
           - Identify a specific pain point
           - Agitate that problem
           - Present the product as the urgent solution
-          - Example: "Time tracking app" → "Stop losing 10 hours every week to chaos. The system that rescues your productivity, starting today."
 
           VERSION 3 - SOCIAL PROOF & PREMIUM STATUS:
           - Emphasize that successful people choose this
           - Include implied testimonials or popularity
           - Position as the premium/smart choice
-          - Example: "Notebooks" → "The journal chosen by leading entrepreneurs. Where million-dollar ideas take shape."
 
-          Each version must:
-          - Sound like a completely different marketing campaign
-          - Target the same product but from a unique angle
-          - Use different vocabulary and tone
-          - Create different emotional responses
-          - Be specific to the target market
+          Each version must sound like a completely different marketing campaign and create different emotional responses.
 
           Return the results in the following JSON format:
           {
@@ -382,7 +402,6 @@ export async function generateProductSuggestions(
       temperature: 0.85,
     });
 
-    // Extract and parse response
     let jsonContent = '';
     if (response.content && Array.isArray(response.content)) {
       for (const block of response.content) {
@@ -398,7 +417,7 @@ export async function generateProductSuggestions(
     }
 
     try {
-      const suggestions = JSON.parse(jsonContent) as ProductSuggestionResponse;
+      const suggestions = parseJSON(jsonContent) as ProductSuggestionResponse;
       return suggestions;
     } catch (parseError) {
       console.error('Failed to parse suggestions JSON:', parseError);
@@ -432,7 +451,7 @@ export async function generateDemographics(
           - Age range (e.g., "18-24", "25-34", "35-44", "45-54", "55-64", "65+")
           - Gender (e.g., "Male", "Female", "Non-binary", "Other")
           - List of specific interests relevant to the product
-          - Mosaic Category (choose one from: "Affluent Achievers", "Rising Prosperity", "Comfortable Communities", "Financially Stretched", "Urban Cohesion", "Suburban Mindsets", "Modest Traditions", "Not Private Households")
+          - Mosaic Category (choose one from: "Power Elite", "Affluent Achievers", "Rising Prosperity", "Comfortable Communities", "Financially Stretched", "Urban Cohesion", "Suburban Mindsets", "Modest Traditions")
           - A concise description of this demographic segment (1-2 sentences)
 
           Each demographic profile should be realistic and representative of a segment that might engage with this product. Make sure the profiles are diverse and cover different age groups, genders, and interests.
@@ -471,7 +490,7 @@ export async function generateDemographics(
     }
 
     try {
-      const demographics = JSON.parse(jsonContent) as Demographics[];
+      const demographics = parseJSON(jsonContent) as Demographics[];
       return demographics;
     } catch (parseError) {
       console.error('Failed to parse demographics JSON:', parseError);
@@ -481,74 +500,72 @@ export async function generateDemographics(
 }
 
 /**
- * Simulate a response from a specific demographic using Claude
+ * IMPROVED: Simulate a response from a specific demographic using better prompting
  */
 export async function simulateResponse(params: SimulationParams): Promise<LLMResponse> {
   console.log('Simulating response for demographic:', params.demographic.id);
 
+  // Get context about product match to help LLM make realistic decisions
+  const productContext = getProductMatchContext(
+    params.demographic,
+    params.productDescription,
+    params.tagline,
+    params.salesPrice
+  );
+
   return withRetry(async () => {
     const response = await anthropic.messages.create({
       model: "claude-3-5-sonnet-latest",
-      max_tokens: 150,
-      system: "You will adopt a specific demographic persona and evaluate an advertisement.",
+      max_tokens: 200,
+      system: `You are simulating realistic consumer behavior for marketing research.
+
+CRITICAL CALIBRATION: Industry data shows that 2-5% of well-targeted consumers actually purchase products that match their interests and budget. You must reflect this reality - don't be overly conservative.
+
+Your responses should follow realistic patterns:
+- If product strongly matches interests + affordable: More likely to purchase
+- If product matches interests + slightly expensive: More likely to save for later
+- If product loosely matches interests: More likely to click to learn more
+- If no interest match OR way too expensive: More likely to ignore
+
+You must be realistic about actual consumer behavior, not overly pessimistic.`,
       messages: [
         {
           role: "user",
-          content: `You will act as a specific demographic persona and evaluate your reaction to an advertisement.
+          content: `You are a specific consumer seeing this ad. Respond authentically based on your profile.
 
-          Your demographic persona is:
-          - Age: ${params.demographic.age}
-          - Gender: ${params.demographic.gender}
-          - Interests: ${params.demographic.interests.join(", ")}
-          - Socioeconomic profile: ${params.demographic.mosaicCategory}
-          - Persona description: ${params.demographic.description}
+CONSUMER PROFILE:
+- Age: ${params.demographic.age}
+- Gender: ${params.demographic.gender}
+- Interests: ${params.demographic.interests.join(", ")}
+- Economic Profile: ${params.demographic.mosaicCategory}
+- Background: ${params.demographic.description}
 
-          You are browsing online and see an advertisement for the following product:
+ADVERTISEMENT:
+- Tagline: "${params.tagline}"
+- Price: ${params.salesPrice}
+- Full Product: ${params.productDescription}
 
-          Tagline: "${params.tagline}"
-          Price: $${params.salesPrice}
-          Product Category: : ${params.productDescription.split(' ').slice(0, 3).join(' ')}
+${productContext}
 
-          This is what appears in the ad preview - you would only see the full product description and details if you click through to learn more.
-          The full product description is: "${params.productDescription}"
+IMPORTANT: Real consumers DO buy products that match their interests and budget. If this product aligns with your interests and is reasonably priced, you should be inclined to purchase or save it. Be realistic about normal consumer behavior.
 
-          IMPORTANT BEHAVIORAL GUIDELINES:
-          - You're someone who has shown interest in this type of product (otherwise you wouldn't see this targeted ad)
-          - While most people ignore ads, you're in the target audience so you're more likely to engage
-          - Consider if this product aligns with your interests: ${params.demographic.interests.join(", ")}
-          - Price sensitivity varies by socioeconomic profile (${params.demographic.mosaicCategory})
+Based on your authentic consumer profile, choose your most likely response:
 
-          REALISTIC CONVERSION EXPECTATIONS:
-          - About 40-50% might ignore the ad (not interested right now)
-          - About 25-30% might click to learn more
-          - About 10-15% might save for later consideration
-          - About 10-15% might purchase if it's a good fit and reasonably priced
+1. "ignore" - Scroll past (only if truly no interest or way too expensive)
+2. "followLink" - Click to learn more (interested but need more info)
+3. "followAndBuy" - Click and purchase (product matches interests + affordable)
+4. "followAndSave" - Click and save for later (interested but price is a concern)
 
-          Consider the price point in relation to this demographic's typical spending power based on their socioeconomic profile (${params.demographic.mosaicCategory}) and age range.
-          Factor in whether this price seems reasonable, expensive, or cheap for someone in this demographic when making your decision.
-          A higher price might make some demographics more interested (premium appeal) or less interested (affordability concerns).
-          Lower prices might seem like great value or raise quality concerns.
+Respond in JSON format:
+{
+  "choice": "your_choice_here",
+  "text": "1-2 sentence explanation in first person as this consumer"
+}
 
-          Based on your demographic persona, how would you most likely respond to this advertisement? Choose exactly one of these options:
-          1. "ignore" - You would scroll past or ignore the advertisement
-          2. "followLink" - You would click on the advertisement to learn more, but wouldn't make a purchase now
-          3. "followAndBuy" - You would click on the advertisement and likely make a purchase
-          4. "followAndSave" - You would click on the advertisement and save it for potential later purchase
-
-          Provide your response in JSON format with two fields:
-          - "choice": One of the four options above (exactly as written)
-          - "text": A brief explanation (1-2 sentences) of your reasoning, written in first person from the perspective of this demographic
-
-          Example format:
-          {
-            "choice": "followAndBuy",
-            "text": "I've been looking for exactly this kind of product and the price point seems reasonable. I would definitely purchase this right away."
-          }
-
-          Return only the JSON with no additional text.`
+Remember: Real consumers DO buy things they want and can afford. Be realistic, not overly conservative.`
         }
       ],
-      temperature: 0.7,
+      temperature: 0.8,
     });
 
     let jsonContent = '';
@@ -566,7 +583,7 @@ export async function simulateResponse(params: SimulationParams): Promise<LLMRes
     }
 
     try {
-      const simulationResponse = JSON.parse(jsonContent) as LLMResponse;
+      const simulationResponse = parseJSON(jsonContent) as LLMResponse;
       return simulationResponse;
     } catch (parseError) {
       console.error('Failed to parse simulation response JSON:', parseError);
@@ -583,9 +600,9 @@ export async function runBatchSimulations(
   count: number
 ): Promise<LLMResponse[]> {
   const results: LLMResponse[] = [];
-  const batchSize = 5;
+  const batchSize = 3; // Smaller batches for more reliable results
   let consecutiveErrors = 0;
-  const maxConsecutiveErrors = 3;
+  const maxConsecutiveErrors = 2;
 
   for (let i = 0; i < count; i += batchSize) {
     const currentBatchSize = Math.min(batchSize, count - i);

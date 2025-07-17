@@ -1,4 +1,6 @@
-// Utility for estimating demographic market sizes with marketing strategy integration
+// frontend/src/utils/DemographicSizing.ts
+// Fixed version with realistic market penetration rates
+
 import { Demographics, SimulationResult, MarketingStrategy, createDefaultMarketingStrategy } from '../types';
 import { calculateTotalMarketPenetration, calculateChannelModifiers } from './MarketingChannels';
 
@@ -63,7 +65,7 @@ export function estimateDemographicSize(demographic: Demographics): number {
   // Calculate final estimated size
   const estimatedSize = Math.floor(baseSize * interestFactor * mosaicFactor);
 
-  return Math.max(1000000, estimatedSize); // Minimum 1M people
+  return Math.max(500000, estimatedSize); // Minimum 500K people (more realistic than 1M)
 }
 
 /**
@@ -129,13 +131,35 @@ export function calculateTotalMarketSize(demographics: Demographics[]): number {
   }, 0);
 }
 
-export function getMarketPenetrationRate(): number {
-  return 0.005; // 0.5% - this could be made configurable
+/**
+ * FIXED: Return realistic market penetration rate based on marketing spend and strategy
+ */
+export function getMarketPenetrationRate(marketingStrategy?: MarketingStrategy): number {
+  if (!marketingStrategy) {
+    // Default organic reach without paid marketing
+    return 0.0002; // 0.02% - realistic for organic reach
+  }
+
+  // Calculate penetration based on marketing budget
+  const totalBudget = marketingStrategy.totalBudget;
+
+  // Base penetration rates by budget tier (toned down by 90%)
+  if (totalBudget >= 20000) {
+    return 0.0045; // 0.45% - Major campaign reach
+  } else if (totalBudget >= 10000) {
+    return 0.0025; // 0.25% - Substantial campaign
+  } else if (totalBudget >= 5000) {
+    return 0.0015; // 0.15% - Moderate campaign
+  } else if (totalBudget >= 1000) {
+    return 0.0008; // 0.08% - Small campaign
+  } else {
+    return 0.0003; // 0.03% - Minimal campaign
+  }
 }
 
 /**
- * Calculate estimated revenue for a demographic based on simulation results
- * Updated to handle marketing strategy properly
+ * FIXED: Calculate estimated revenue for a demographic based on simulation results
+ * Now uses realistic market penetration rates
  */
 export function calculateDemographicRevenue(
   demographic: Demographics,
@@ -157,16 +181,24 @@ export function calculateDemographicRevenue(
   // Apply channel modifiers to conversion rate
   const effectiveConversionRate = baseConversionRate * modifiers.conversionBoost;
 
+  // FIXED: Use realistic market penetration calculation
+  const realisticPenetration = Math.max(
+    getMarketPenetrationRate(strategy), // Minimum realistic penetration
+    marketPenetration * 0.03 // Scale down the marketing channels calculation even more
+  );
+
   // Calculate reach and sales
-  const peopleReached = Math.floor(marketSize * marketPenetration);
+  const peopleReached = Math.floor(marketSize * realisticPenetration);
   const estimatedPurchases = Math.floor(peopleReached * effectiveConversionRate);
   const revenue = estimatedPurchases * salesPrice;
+
+  console.log(`Demographic ${demographic.id}: Market ${marketSize.toLocaleString()}, Penetration ${(realisticPenetration * 100).toFixed(3)}%, Reached ${peopleReached.toLocaleString()}, Conversion ${(effectiveConversionRate * 100).toFixed(2)}%, Purchases ${estimatedPurchases.toLocaleString()}, Revenue $${revenue.toLocaleString()}`);
 
   return Math.max(0, revenue);
 }
 
 /**
- * Calculate estimated revenue for a demographic with full marketing strategy details
+ * FIXED: Calculate estimated revenue for a demographic with full marketing strategy details
  */
 export function calculateDemographicRevenueWithMarketing(
   demographic: Demographics,
@@ -193,8 +225,14 @@ export function calculateDemographicRevenueWithMarketing(
   // Apply channel modifiers to conversion rate
   const effectiveConversionRate = baseConversionRate * modifiers.conversionBoost;
 
+  // FIXED: Use realistic market penetration calculation
+  const realisticPenetration = Math.max(
+    getMarketPenetrationRate(marketingStrategy), // Minimum realistic penetration
+    marketPenetration * 0.03 // Scale down the marketing channels calculation even more
+  );
+
   // Calculate reach and sales
-  const peopleReached = Math.floor(marketSize * marketPenetration);
+  const peopleReached = Math.floor(marketSize * realisticPenetration);
   const estimatedPurchases = Math.floor(peopleReached * effectiveConversionRate);
   const revenue = estimatedPurchases * salesPrice;
   const grossProfit = estimatedPurchases * (salesPrice - unitCost);
@@ -226,7 +264,7 @@ export function calculateDemographicRevenueWithMarketing(
 }
 
 /**
- * Calculate estimated profit for a demographic (legacy function for backward compatibility)
+ * FIXED: Calculate estimated profit for a demographic (legacy function for backward compatibility)
  */
 export function calculateDemographicProfit(
   demographic: Demographics,
@@ -238,6 +276,6 @@ export function calculateDemographicProfit(
   const revenue = calculateDemographicRevenue(demographic, simulationResult, salesPrice, unitCost, marketingStrategy);
   const unitsSold = revenue / salesPrice;
   const profit = revenue - (unitsSold * unitCost);
-  
+
   return Math.max(0, profit);
 }
