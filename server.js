@@ -13,6 +13,7 @@ const PORT = process.env.PORT || 3001;
 const demographicsRoutes = require('./backend/dist/routes/demographics');
 const simulationRoutes = require('./backend/dist/routes/simulation');
 const suggestionsRoutes = require('./backend/dist/routes/suggestions');
+const leaderboardRoutes = require('./backend/dist/routes/leaderboard');
 
 // Middleware
 app.use(cors());
@@ -22,7 +23,7 @@ app.use(express.json());
 app.use('/api/demographics', demographicsRoutes.default);
 app.use('/api/simulation', simulationRoutes.default);
 app.use('/api/suggestions', suggestionsRoutes.default);
-
+app.use('/api/leaderboard', leaderboardRoutes.default);
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
@@ -37,6 +38,13 @@ app.get('*', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+const startServer = async () => {
+  await testConnection();
+  await initializeDatabase();
+
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+};
+
+startServer();
