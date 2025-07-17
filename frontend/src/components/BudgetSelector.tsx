@@ -65,8 +65,7 @@ export const BudgetSelector: React.FC<BudgetSelectorProps> = ({
   };
 
   const calculateMinCampaignCost = (level: BudgetLevel): number => {
-    const config = BUDGET_LEVELS[level];
-    return config.campaignCost + 200 + (1 * 10 * 2);
+    return 500;
   };
 
   const calculateMaxCampaigns = (level: BudgetLevel): number => {

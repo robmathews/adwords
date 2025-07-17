@@ -77,8 +77,6 @@ export type BudgetLevel = 'trust-fund-kid' | 'life-savings' | 'bartender';
 export interface BudgetConfig {
   level: BudgetLevel;
   startingBudget: number;
-  campaignCost: number;
-  simulationCostPerDemo: number;
   name: string;
   description: string;
   emoji: string;

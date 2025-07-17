@@ -245,7 +245,7 @@ function App() {
       timestamp: new Date(),
       // NEW: Budget fields
       budgetLevel: gameState.finances.budgetLevel,
-      campaignCosts: { baseCampaignSetup: 0, demographicResearch: 0, marketingCost: 0, total: 0 },
+      campaignCosts: { marketingCost: 0, total: 0 },
       netProfit: 0,
       roi: 0
     };
@@ -860,11 +860,6 @@ function App() {
                   <span className="font-semibold text-red-300">
                     {formatCurrency(currentRun.campaignCosts.total)}
                   </span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-xs text-gray-400">
-                  <div>Setup: {formatCurrency(currentRun.campaignCosts.baseCampaignSetup)}</div>
-                  <div>Research: {formatCurrency(currentRun.campaignCosts.demographicResearch)}</div>
-                  <div>Marketing Cost: {formatCurrency(currentRun.campaignCosts.marketingCost)}</div>
                 </div>
               </div>
 
