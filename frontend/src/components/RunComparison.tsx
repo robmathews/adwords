@@ -39,7 +39,7 @@ export const RunComparison: React.FC<RunComparisonProps> = ({
   isSavingToLeaderboard
 }) => {
   // State for async leaderboard data
-  const [qualifiesForLeaderboard, setQualifiesForLeaderboard] = useState<boolean>(false);
+  const [qualifiesForLeaderboard, setQualifiesForLeaderboard] = useState<boolean>(true);
   const [potentialRank, setPotentialRank] = useState<number | null>(null);
   const [performanceCategory, setPerformanceCategory] = useState<any>(null);
 
