@@ -251,7 +251,7 @@ export async function checkQualification(totalRevenue: number): Promise<Qualific
         qualifies: true,
         currentEntryCount,
         minimumRevenue: null,
-        projectedRank: currentEntryCount
+        projectedRank: currentEntryCount + 1
       };
     }
 
