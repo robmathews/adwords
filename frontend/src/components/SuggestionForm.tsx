@@ -66,8 +66,7 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
     playerName: ''
   });
 
-  // NEW: Calculate estimated campaign costs
-  const estimatedCosts = calculateCampaignCosts(gameState.finances.budgetLevel, 3); // Estimate 3 demographics
+  const estimatedCosts = calculateCampaignCosts(gameState.finances.budgetLevel, 3, 500);
   const canAffordEstimate = gameState.finances.currentBudget >= estimatedCosts.total;
   const budgetAfterCampaign = gameState.finances.currentBudget - estimatedCosts.total;
 
@@ -135,6 +134,7 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
 
   const handleQuickStartProduct = (productSugg: ProductSuggestion) => {
     setProductDescription(productSugg.productDescription);
+    setTagline(productSugg.tagline);
     setMarket(productSugg.targetMarket);
     setCurrentSalesPrice(productSugg.salesPrice);
     setCurrentUnitCost(productSugg.unitCost);
@@ -218,11 +218,7 @@ export const SuggestionForm: React.FC<SuggestionFormProps> = ({
           </div>
           <p className="text-red-200 mb-4">
             You only have {formatCurrency(gameState.finances.currentBudget)} left, but a typical campaign costs around {formatCurrency(estimatedCosts.total)}.
-            You need to reduce your campaign scope or restart with an easier difficulty level.
           </p>
-          <div className="text-sm text-red-300">
-            💡 Tip: Campaigns with fewer demographics and simulations cost less!
-          </div>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
               onClick={handleBudgetCrisisReset}

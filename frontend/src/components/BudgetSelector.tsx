@@ -202,14 +202,6 @@ export const BudgetSelector: React.FC<BudgetSelectorProps> = ({
                   </div>
 
                   <div className={`space-y-2 text-sm ${isSelected ? 'text-white/80' : 'text-gray-400'}`}>
-                    <div className="flex justify-between">
-                      <span>Campaign Setup:</span>
-                      <span>{formatCurrency(config.campaignCost)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Per Demographic:</span>
-                      <span>${config.simulationCostPerDemo}</span>
-                    </div>
                     <div className="border-t border-white/20 pt-2 mt-2">
                       <div className="flex justify-between font-medium">
                         <span>Max Campaigns:</span>
@@ -262,7 +254,6 @@ export const BudgetSelector: React.FC<BudgetSelectorProps> = ({
             <h4 className="font-medium text-white mb-2">💰 Budget System</h4>
             <ul className="space-y-1">
               <li>• Each campaign costs money to run</li>
-              <li>• Costs scale with demographics and testing</li>
               <li>• Revenue is added to your budget after each campaign</li>
               <li>• Build up through multiple campaigns</li>
             </ul>

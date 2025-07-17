@@ -118,8 +118,7 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
 
   // Calculate campaign costs - NOW INCLUDING MARKETING STRATEGY
   const selectedDemographics = demographics.filter(d => config.selectedDemographics.includes(d.id));
-  const marketingCost = marketingStrategy ? calculateMarketingCost(marketingStrategy) : 0;
-  // Base campaign costs (demographic research + testing)
+  const marketingCost = marketingStrategy ? calculateMarketingCost(marketingStrategy) : 500; // Default $500 minimum
   const totalCampaignCosts = calculateCampaignCosts(
     gameState.finances.budgetLevel,
     selectedDemographics.length,
@@ -182,25 +181,6 @@ export const SimulationConfig: React.FC<SimulationConfigProps> = ({
                 {gameState.hasSubmittedToLeaderboard ? '🏆 Game Over' : '💫 Can Submit'}
               </div>
               <div className="text-sm text-blue-700">Leaderboard Status</div>
-            </div>
-          </div>
-
-          {/* NEW: Detailed cost breakdown */}
-          <div className="border-t border-blue-200 pt-4">
-            <h4 className="font-medium text-blue-800 mb-2">Cost Breakdown:</h4>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-blue-700">Base Setup:</span>
-                <span className="text-blue-900">{formatCurrency(totalCampaignCosts.baseCampaignSetup)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-blue-700">Research:</span>
-                <span className="text-blue-900">{formatCurrency(totalCampaignCosts.demographicResearch)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-blue-700">Marketing:</span>
-                <span className="text-blue-900">{formatCurrency(marketingCost)}</span>
-              </div>
             </div>
           </div>
         </div>

@@ -86,8 +86,6 @@ export interface BudgetConfig {
 
 // NEW: Campaign costs breakdown
 export interface CampaignCosts {
-  baseCampaignSetup: number;
-  demographicResearch: number; // Cost per demographic
   marketingCost: number;
   total: number;
 }
@@ -164,8 +162,6 @@ export const BUDGET_LEVELS: Record<BudgetLevel, BudgetConfig> = {
   'trust-fund-kid': {
     level: 'trust-fund-kid',
     startingBudget: 100000,
-    campaignCost: 2000,
-    simulationCostPerDemo: 100,
     name: 'Trust Fund Kid',
     description: 'Daddy\'s money makes everything easier',
     emoji: '💰'
@@ -173,8 +169,6 @@ export const BUDGET_LEVELS: Record<BudgetLevel, BudgetConfig> = {
   'life-savings': {
     level: 'life-savings',
     startingBudget: 25000,
-    campaignCost: 1500,
-    simulationCostPerDemo: 75,
     name: 'Life Savings',
     description: 'Everything you\'ve saved is on the line',
     emoji: '💳'
@@ -182,8 +176,6 @@ export const BUDGET_LEVELS: Record<BudgetLevel, BudgetConfig> = {
   'bartender': {
     level: 'bartender',
     startingBudget: 5000,
-    campaignCost: 1000,
-    simulationCostPerDemo: 50,
     name: 'Bartender',
     description: 'Tips and night shifts fund your dreams',
     emoji: '🍺'
@@ -208,16 +200,9 @@ export function calculateCampaignCosts(
   demographicsCount: number,
   marketingCost: number = 0
 ): CampaignCosts {
-  const config = BUDGET_LEVELS[budgetLevel];
-
-  const baseCampaignSetup = config.campaignCost;
-  const demographicResearch = demographicsCount * 200; // Research cost per demographic
-
   return {
-    baseCampaignSetup,
-    demographicResearch,
     marketingCost,
-    total: baseCampaignSetup + demographicResearch + marketingCost
+    total: marketingCost
   };
 }
 

@@ -116,7 +116,7 @@ export const MarketingStrategySelector: React.FC<MarketingStrategySelectorProps>
             <input
               type="range"
               min="500"
-              max="25000"
+              max="100000"
               step="500"
               value={customBudget}
               onChange={(e) => setCustomBudget(parseInt(e.target.value))}
@@ -231,15 +231,6 @@ export const MarketingStrategySelector: React.FC<MarketingStrategySelectorProps>
                     <span className="text-gray-600 text-sm">Engagement Boost</span>
                     <span className="font-bold text-blue-600">
                       +{((strategyMetrics.avgEngagementBoost - 1) * 100).toFixed(0)}%
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-white rounded border">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 text-sm">Expected ROI</span>
-                    <span className={`font-bold ${strategyMetrics.roi >= 2 ? 'text-green-600' : strategyMetrics.roi >= 1 ? 'text-yellow-600' : 'text-red-600'}`}>
-                      {(strategyMetrics.roi * 100).toFixed(0)}%
                     </span>
                   </div>
                 </div>

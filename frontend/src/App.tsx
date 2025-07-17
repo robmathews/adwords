@@ -197,7 +197,6 @@ function App() {
     return canAffordCampaign(gameState.finances.currentBudget, costs);
   };
 
-  // NEW: Deduct campaign costs
   const deductCampaignCosts = (costs: CampaignCosts) => {
     setGameState(prev => ({
       ...prev,
@@ -580,11 +579,11 @@ function App() {
     setRecentResponses([]);
 
     // Reset form state to defaults for new campaign
-    setInitialProductDescription('');
-    setInitialTagline('');
-    setTargetMarket('');
-    setSalesPrice(49.99);
-    setUnitCost(15.00);
+    setInitialProductDescription(currentRun.productDescription);
+    setInitialTagline(currentRun.tagline);
+    setTargetMarket(currentRun.targetMarket);
+    setSalesPrice(currentRun.salesPrice);
+    setUnitCost(currentRun.unitCost);
   };
 
 

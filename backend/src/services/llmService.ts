@@ -512,11 +512,17 @@ export async function simulateResponse(params: SimulationParams): Promise<LLMRes
           This is what appears in the ad preview - you would only see the full product description and details if you click through to learn more.
           The full product description is: "${params.productDescription}"
 
-          IMPORTANT: Be realistic about consumer behavior. Most people (70-80%) typically ignore ads they see online, especially if:
-          - The product doesn't directly solve a current problem they have
-          - The price seems too high for their budget
-          - They're not actively shopping for this type of product
-          - The ad doesn't immediately grab their attention
+          IMPORTANT BEHAVIORAL GUIDELINES:
+          - You're someone who has shown interest in this type of product (otherwise you wouldn't see this targeted ad)
+          - While most people ignore ads, you're in the target audience so you're more likely to engage
+          - Consider if this product aligns with your interests: ${params.demographic.interests.join(", ")}
+          - Price sensitivity varies by socioeconomic profile (${params.demographic.mosaicCategory})
+
+          REALISTIC CONVERSION EXPECTATIONS:
+          - About 40-50% might ignore the ad (not interested right now)
+          - About 25-30% might click to learn more
+          - About 10-15% might save for later consideration
+          - About 10-15% might purchase if it's a good fit and reasonably priced
 
           Consider the price point in relation to this demographic's typical spending power based on their socioeconomic profile (${params.demographic.mosaicCategory}) and age range.
           Factor in whether this price seems reasonable, expensive, or cheap for someone in this demographic when making your decision.

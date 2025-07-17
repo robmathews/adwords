@@ -209,12 +209,35 @@ export function calculateChannelReach(
   spend: number,
   demographic: Demographics
 ): number {
-  // Base reach calculation with diminishing returns
-  const spendRatio = spend / (channel.minimumSpend || 100);
-  const baseReach = Math.min(
-    channel.maxReach,
-    channel.maxReach * (1 - Math.exp(-spendRatio * channel.scalingEfficiency))
-  );
+  console.log(`Calculating reach for ${channel.name} with spend $${spend}`);
+
+  // Ensure minimum spend is met
+  if (spend < (channel.minimumSpend || 0)) {
+    console.log(`Spend $${spend} below minimum $${channel.minimumSpend || 0} for ${channel.name}`);
+    return 0;
+  }
+
+  // Calculate spend ratio - this was the main issue!
+  // The old calculation used Math.exp which created very small numbers
+  const minSpend = channel.minimumSpend || 100;
+  const spendRatio = spend / minSpend;
+
+  // New linear scaling with diminishing returns
+  // This gives much more realistic scaling with budget
+  let reachMultiplier;
+  if (spendRatio <= 1) {
+    // Linear scaling up to minimum spend
+    reachMultiplier = spendRatio;
+  } else {
+    // Diminishing returns after minimum spend
+    // Formula: 1 + log(spendRatio) * scalingEfficiency
+    reachMultiplier = 1 + Math.log(spendRatio) * channel.scalingEfficiency;
+  }
+
+  // Apply the channel's max reach cap
+  const baseReach = Math.min(channel.maxReach, channel.maxReach * reachMultiplier);
+
+  console.log(`${channel.name}: spendRatio=${spendRatio.toFixed(2)}, reachMultiplier=${reachMultiplier.toFixed(2)}, baseReach=${(baseReach * 100).toFixed(1)}%`);
 
   // Demographic affinity modifier
   let demographicModifier = 1.0;
@@ -222,10 +245,13 @@ export function calculateChannelReach(
       channel.demographics.includes(demographic.age)) {
     demographicModifier = 1.0;
   } else {
-    demographicModifier = 0.5; // Reduced effectiveness for non-target demographics
+    demographicModifier = 0.6; // Reduced effectiveness for non-target demographics
   }
 
-  return baseReach * demographicModifier;
+  const finalReach = baseReach * demographicModifier;
+  console.log(`Final reach for ${channel.name}: ${(finalReach * 100).toFixed(2)}%`);
+
+  return finalReach;
 }
 
 // Calculate total cost for a marketing strategy
@@ -430,3 +456,6 @@ export function calculateOptimalAllocation(
   
   return allocations;
 }
+
+
+
